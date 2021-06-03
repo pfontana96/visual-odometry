@@ -1,0 +1,5 @@
+<launch>
+    <node pkg="ottobot_onboard" type="realsense.py" name="d435i" ns="ottobot">
+        <param name="frame_rate" value="15"/>
+    </node>
+</launch>
