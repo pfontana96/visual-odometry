@@ -91,21 +91,14 @@ class RealSenseCameraNode(object):
 
                 # Convert images to ROS messages
                 try:
-                    color_image_msg = bridge.cv2_to_imgmsg(color_image.astype(float), encoding="passthrough")
-                    depth_image_msg = bridge.cv2_to_imgmsg(depth_image.astype(float), encoding="passthrough")
+                    color_image_msg = bridge.cv2_to_imgmsg(color_image.astype(np.int8), encoding="passthrough")
+                    depth_image_msg = bridge.cv2_to_imgmsg(depth_image.astype(np.int8), encoding="passthrough")
                 except CvBridgeError as e:
-                    rospy.logerror(e)
+                    rospy.logerr(e)
                     continue
 
                 color_image_msg.header.stamp = now
                 depth_image_msg.header.stamp = now
-
-                # Debugging
-                # Show images
-                images = np.hstack((color_image, depth_image))
-                cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
-                cv2.imshow('RealSense', images)
-                cv2.waitKey(1)
 
                 # Publish images
                 self.rgb_pub.publish(color_image_msg)
