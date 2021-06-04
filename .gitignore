@@ -49,3 +49,10 @@ qtcreator-*
 
 # Catkin custom files
 CATKIN_IGNORE
+.catkin_tools/
+
+# Virtual envs
+venv/
+
+# cv_bridge
+vision_opencv/
