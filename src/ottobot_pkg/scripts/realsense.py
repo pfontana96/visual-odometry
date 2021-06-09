@@ -36,7 +36,7 @@ class RealSenseCameraNode(object):
         self.name = rospy.get_param("name", "realsense_camera")
         rospy.init_node(self.name)
 
-        self.frame_id = rospy.get_param("frame_id", "/map")
+        self.frame_id = rospy.get_param("frame_id", "map")
         self.frame_rate = rospy.get_param("frame_rate", 15) # Defaults to 15 fps
         
         self.rgb_pub = rospy.Publisher(self.name+"/rgb_image", 
@@ -100,6 +100,9 @@ class RealSenseCameraNode(object):
                 color_image_msg.header.stamp = now
                 depth_image_msg.header.stamp = now
 
+                color_image_msg.header.frame_id = self.frame_id
+                color_image_msg.header.frame_id = self.frame_id
+
                 # Publish images
                 self.rgb_pub.publish(color_image_msg)
                 self.depth_pub.publish(depth_image_msg)
@@ -109,7 +112,5 @@ class RealSenseCameraNode(object):
 
 if __name__ == "__main__":
     rs_camera_node = RealSenseCameraNode()
-    try:
-        rs_camera_node.run()
-    except rospy.ROSInterruptException:
-        pass
+    rs_camera_node.run()
+    

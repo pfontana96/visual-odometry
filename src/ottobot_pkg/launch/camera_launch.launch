@@ -1,5 +1,11 @@
 <launch>
-    <node pkg="ottobot_onboard" type="realsense.py" name="d435i" ns="ottobot">
-        <param name="frame_rate" value="15"/>
+    <node pkg="tf2_ros" type="static_transform_publisher" name="rs_frame" args="0 0 0.16 0 0 10 base_link rs_frame" />
+
+    <node pkg="ottobot_pkg" type="realsense.py" name="d435i" ns="ottobot">
+        <param name="frame_rate" value="30"/>
+        <param name="frame_id" value="rs_frame"/>
+    </node>
+    <node pkg="ottobot_pkg" type="realsense_imu.py" name="d435i_imu" ns="ottobot">
+        <param name="frame_id" value="rs_frame"/>
     </node>
 </launch>
