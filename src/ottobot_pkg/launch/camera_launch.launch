@@ -1,11 +1,14 @@
 <launch>
-    <node pkg="tf2_ros" type="static_transform_publisher" name="rs_frame" args="0 0 0.16 0 0 10 base_link rs_frame" />
+    <node pkg="tf2_ros" type="static_transform_publisher" name="tf_camera_link" args="0 0 0.16 0 0 10 base_link camera_link" />
 
-    <node pkg="ottobot_pkg" type="realsense.py" name="d435i" ns="ottobot">
-        <param name="frame_rate" value="30"/>
-        <param name="frame_id" value="rs_frame"/>
+    <node pkg="ottobot_pkg" type="realsense_camera.py" name="realsense_camera" ns="ottobot">
+        <param name="frame_rate" value="15"/>
+        <param name="frame_id" value="camera_link"/>
     </node>
-    <node pkg="ottobot_pkg" type="realsense_imu.py" name="d435i_imu" ns="ottobot">
-        <param name="frame_id" value="rs_frame"/>
-    </node>
+
+    <!-- Streaming nodes -->
+    <node pkg="image_transport" type="republish" name="color_republisher" ns="ottobot" 
+    args="raw in:=/ottobot/realsense_camera/raw/rgb_image compressed out:=/ottobot/realsense_camera/compressed/rgb_image"/>
+    <node pkg="image_transport" type="republish" name="depth_republisher" ns="ottobot" 
+    args="raw in:=/ottobot/realsense_camera/raw/depth_image compressed out:=/ottobot/realsense_camera/compressed/depth_image"/>
 </launch>
