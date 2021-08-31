@@ -9,7 +9,8 @@ Panels:
         - /Imu1
         - /Imu1/Box properties1
         - /Imu1/Axes properties1
-      Splitter Ratio: 0.5
+        - /Imu1/Acceleration properties1
+      Splitter Ratio: 0.550000011920929
     Tree Height: 441
   - Class: rviz/Selection
     Name: Selection
@@ -78,9 +79,9 @@ Visualization Manager:
     - Acceleration properties:
         Acc. vector alpha: 1
         Acc. vector color: 255; 0; 0
-        Acc. vector scale: 1
+        Acc. vector scale: 0.10000000149011612
         Derotate acceleration: true
-        Enable acceleration: false
+        Enable acceleration: true
       Axes properties:
         Axes scale: 1
         Enable axes: false
@@ -97,7 +98,7 @@ Visualization Manager:
       Topic: /ottobot/realsense_camera/imu
       Unreliable: false
       Value: true
-      fixed_frame_orientation: true
+      fixed_frame_orientation: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -126,26 +127,86 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 3.5866167545318604
+      Distance: 2.9518837928771973
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
         Swap Stereo Eyes: false
         Value: false
       Focal Point:
-        X: 0.133841410279274
-        Y: 0.4104619324207306
-        Z: -0.12032272666692734
+        X: 0.17229211330413818
+        Y: -0.14840099215507507
+        Z: -0.016893606632947922
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.5153974294662476
+      Pitch: 0.3852032721042633
       Target Frame: <Fixed Frame>
       Value: Orbit (rviz)
-      Yaw: 0.875397264957428
-    Saved: ~
+      Yaw: 4.85860013961792
+    Saved:
+      - Class: rviz/Orbit
+        Distance: 1.463202714920044
+        Enable Stereo Rendering:
+          Stereo Eye Separation: 0.05999999865889549
+          Stereo Focal Distance: 1
+          Swap Stereo Eyes: false
+          Value: false
+        Focal Point:
+          X: 0.17229211330413818
+          Y: -0.14840099215507507
+          Z: -0.016893606632947922
+        Focal Shape Fixed Size: true
+        Focal Shape Size: 0.05000000074505806
+        Invert Z Axis: false
+        Name: Orbit
+        Near Clip Distance: 0.009999999776482582
+        Pitch: 0.4453980028629303
+        Target Frame: <Fixed Frame>
+        Value: Orbit (rviz)
+        Yaw: 0.7603979110717773
+      - Class: rviz/Orbit
+        Distance: 1.463202714920044
+        Enable Stereo Rendering:
+          Stereo Eye Separation: 0.05999999865889549
+          Stereo Focal Distance: 1
+          Swap Stereo Eyes: false
+          Value: false
+        Focal Point:
+          X: 0.17229211330413818
+          Y: -0.14840099215507507
+          Z: -0.016893606632947922
+        Focal Shape Fixed Size: true
+        Focal Shape Size: 0.05000000074505806
+        Invert Z Axis: false
+        Name: Orbit
+        Near Clip Distance: 0.009999999776482582
+        Pitch: 0.4453980028629303
+        Target Frame: <Fixed Frame>
+        Value: Orbit (rviz)
+        Yaw: 0.7603979110717773
+      - Class: rviz/Orbit
+        Distance: 2.1746859550476074
+        Enable Stereo Rendering:
+          Stereo Eye Separation: 0.05999999865889549
+          Stereo Focal Distance: 1
+          Swap Stereo Eyes: false
+          Value: false
+        Focal Point:
+          X: 0.17229211330413818
+          Y: -0.14840099215507507
+          Z: -0.016893606632947922
+        Focal Shape Fixed Size: true
+        Focal Shape Size: 0.05000000074505806
+        Invert Z Axis: false
+        Name: Orbit
+        Near Clip Distance: 0.009999999776482582
+        Pitch: 0.4353976845741272
+        Target Frame: <Fixed Frame>
+        Value: Orbit (rviz)
+        Yaw: 4.5985846519470215
 Window Geometry:
   Displays:
     collapsed: false

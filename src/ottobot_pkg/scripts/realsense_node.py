@@ -4,56 +4,19 @@ from std_msgs.msg import String, Int8
 from sensor_msgs.msg import Image, Imu
 from cv_bridge import CvBridge, CvBridgeError
 
+from realsense_d435i import RealsenseD435i
+from utils import quaternion_from_euler
+
 import pyrealsense2 as rs
 import numpy as np
 import cv2
+import yaml
+from  pathlib import Path
 
-# Can't believe there is not a native ROS way of doing this with Pyhton3 and tf2_ros 
-def quaternion_from_euler(roll, pitch, yaw):
-    """
-    Converts euler roll, pitch, yaw to quaternion (w in last place)
-    quat = [x, y, z, w]
-    """
-    cy = np.cos(yaw * 0.5)
-    sy = np.sin(yaw * 0.5)
-    cp = np.cos(pitch * 0.5)
-    sp = np.sin(pitch * 0.5)
-    cr = np.cos(roll * 0.5)
-    sr = np.sin(roll * 0.5)
-
-    q = [0] * 4
-    q[0] = cy * cp * cr + sy * sp * sr
-    q[1] = cy * cp * sr - sy * sp * cr
-    q[2] = sy * cp * sr + cy * sp * cr
-    q[3] = sy * cp * cr - cy * sp * sr
-
-    return q
-
-def config_camera(fps, accel_fps, gyro_fps):
-    # Create a pipeline
-    pipeline = rs.pipeline()
-
-    # Create a config and configure the pipeline to stream
-    #  different resolutions of color and depth streams
-    config = rs.config()
-
-    # Get device product line for setting a supporting resolution
-    pipeline_wrapper = rs.pipeline_wrapper(pipeline)
-    pipeline_profile = config.resolve(pipeline_wrapper)
-    device = pipeline_profile.get_device()
-    device_product_line = str(device.get_info(rs.camera_info.product_line))
-
-    config.enable_stream(rs.stream.depth, 640, 480, rs.format.z16, fps)
-
-    if device_product_line == 'L500':
-        config.enable_stream(rs.stream.color, 960, 540, rs.format.bgr8, fps)
-    else:
-        config.enable_stream(rs.stream.color, 640, 480, rs.format.bgr8, fps)
-    
-    config.enable_stream(rs.stream.accel, rs.format.motion_xyz32f, accel_fps)
-    config.enable_stream(rs.stream.gyro, rs.format.motion_xyz32f, gyro_fps)
-
-    return pipeline, config
+# PyYaml workaround for indentation
+class MyDumper(yaml.Dumper):
+    def increase_indent(self, flow=False, indentless=False):
+        return super(MyDumper, self).increase_indent(flow, False)
 
 class OrientationEstimator(object):
     def __init__(self, alpha):
@@ -66,7 +29,6 @@ class OrientationEstimator(object):
         self.theta_x = 0
         self.theta_y = 0
         self.theta_z = 0
-    
 
     def get_orientation(self, accel_data, gyro_data, ts):
         # Process accelerometer
@@ -118,27 +80,39 @@ class RealSenseCameraNode(object):
         self.angular_vel_cov = rospy.get_param("~angular_vel_cov", 0.01)
         self.estimate_orientation = rospy.get_param("~estimate_orientation", False)
 
+        self.enable_imu = rospy.get_param("~enable_imu", False)
+        self.create_pc = rospy.get_param("~create_pc", False)
+
+        self.calibration_filename = rospy.get_param("~calibration_filename", "camera_intrinsics")
+
         self.rgb_pub = rospy.Publisher(self.name+"/raw/rgb_image", 
                                         Image, 
                                         queue_size=5)
         self.depth_pub = rospy.Publisher(self.name+"/raw/depth_image", 
                                         Image, 
                                         queue_size=5)
-        self.imu_pub = rospy.Publisher(self.name+"/imu", 
-                                        Imu, 
-                                        queue_size=5)
+
+        if self.enable_imu:
+            self.imu_pub = rospy.Publisher(self.name+"/imu", 
+                                            Imu, 
+                                            queue_size=5)
+
+        rospy.loginfo("Initializing camera node:\nenable_imu: {}\nestimate_orientation: {}\nfps: {}".format(
+                        self.enable_imu, self.estimate_orientation, self.frame_rate
+                    ))
+        self.camera = None                                       
         ctx = rs.context()
         devices = ctx.query_devices()
         for dev in devices:
+            dev_id = dev.get_info(rs.camera_info.serial_number)
+            rospy.loginfo("Device found '{}' ({})".format(dev.get_info(rs.camera_info.name), dev_id))
+            rospy.loginfo("Resetting..")
             dev.hardware_reset()
-
-        self.pipeline, self.config = config_camera(self.frame_rate, 250, 200)
+            self.camera = RealsenseD435i(ctx, self.frame_rate,
+                                        True, True, self.enable_imu,
+                                        self.create_pc, dev_id)
     
     def run(self):
-
-        # Start streaming
-        profile = self.pipeline.start(self.config)
-        rospy.loginfo("Started streaming..")
 
         bridge = CvBridge()
 
@@ -152,6 +126,21 @@ class RealSenseCameraNode(object):
         imu_msg.linear_acceleration_covariance = [self.linear_acc_cov, 0.0, 0.0, 0.0, self.linear_acc_cov, 0.0, 0.0, 0.0, self.linear_acc_cov]
         imu_msg.angular_velocity_covariance = [self.angular_vel_cov, 0.0, 0.0, 0.0, self.angular_vel_cov, 0.0, 0.0, 0.0, self.angular_vel_cov]
 
+        # Get camera intrinsics and dump them in configuration file
+        camera_matrix, coeffs = self.camera.get_intrinsics()
+        config_path = Path(__file__).resolve().parent.parent.joinpath("config")
+
+        if config_path.exists() and config_path.is_dir():
+            filename = config_path.joinpath(self.calibration_filename).with_suffix('.yaml')
+            rospy.loginfo("Dumping camera intrinsics to '{}'..".format(str(filename)))
+            data = {"camera_matrix": camera_matrix.tolist(), "coeffs":coeffs.tolist()}
+
+            with open(filename, 'w') as f:
+                yaml.dump(data, f, Dumper=MyDumper)
+        else:
+            rospy.logerror("Config directory does not exist: {}".format(str(config_path)))
+
+
         if not self.estimate_orientation:
             imu_msg.orientation_covariance = [-1, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
             imu_msg.orientation.x = 0.0
@@ -163,51 +152,36 @@ class RealSenseCameraNode(object):
 
         try:
             while not rospy.is_shutdown():
-                # Get frameset of color and depth
-                frames = self.pipeline.wait_for_frames()
-                # Get ROS time (this is NOT actually capturing time)
+                # Read camera
+                color_image, depth_image, points, accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z = self.camera.poll()
+                
+                # Get time stamp
                 now = rospy.get_rostime()
 
-                # # frames.get_depth_frame() is a 640x360 depth image
-                depth_frame = frames.get_depth_frame()
-                color_frame = frames.get_color_frame()
+                if self.enable_imu:
+                    # Prepare IMU msg
+                    imu_msg.header.stamp = now
+                    imu_msg.linear_acceleration.x = accel_x
+                    imu_msg.linear_acceleration.y = accel_y
+                    imu_msg.linear_acceleration.z = accel_z
 
-                # Get IMU data (changes a bit from the rest of the API)
-                ctn = 0
-                for frame in frames:
-                    if frame.is_motion_frame():
-                        if not ctn: # accel data
-                            accel = frame.as_motion_frame().get_motion_data()
-                        elif ctn == 1: # gyro data
-                            gyro = frame.as_motion_frame().get_motion_data()
-                        ctn += 1
+                    # Considerinf differences in Realsense frame convention and ROS's one
+                    imu_msg.angular_velocity.x = gyro_z
+                    imu_msg.angular_velocity.y = gyro_x
+                    imu_msg.angular_velocity.z = gyro_y
 
-                # Prepare IMU msg
-                imu_msg.header.stamp = now
-                imu_msg.linear_acceleration.x = accel.x
-                imu_msg.linear_acceleration.y = accel.y
-                imu_msg.linear_acceleration.z = accel.z
-
-                imu_msg.angular_velocity.x = gyro.x
-                imu_msg.angular_velocity.y = gyro.y
-                imu_msg.angular_velocity.z = gyro.z
-
-                if self.estimate_orientation:
-                    # Estimate IMU orientation
-                    ts = frames.get_timestamp()
-                    theta_x, theta_y, theta_z = orientation_est.get_orientation(accel, gyro, ts)
-                    orientation = quaternion_from_euler(theta_z, theta_x, theta_y)
-                    # orientation = quaternion_from_euler(theta_x, theta_y, theta_z)
-                    imu_msg.orientation.x = orientation[0]
-                    imu_msg.orientation.y = orientation[1]
-                    imu_msg.orientation.z = orientation[2]
-                    imu_msg.orientation.w = orientation[3]
+                    if self.estimate_orientation:
+                        # Estimate IMU orientation
+                        ts = frames.get_timestamp()
+                        theta_x, theta_y, theta_z = orientation_est.get_orientation(accel, gyro, ts)
+                        orientation = quaternion_from_euler(theta_z, theta_x, theta_y)
+                        # orientation = quaternion_from_euler(theta_x, theta_y, theta_z)
+                        imu_msg.orientation.x = orientation[0]
+                        imu_msg.orientation.y = orientation[1]
+                        imu_msg.orientation.z = orientation[2]
+                        imu_msg.orientation.w = orientation[3]
 
                 # Prepare image messages
-
-                depth_image = np.asanyarray(depth_frame.get_data())
-                color_image = np.asanyarray(color_frame.get_data())
-
                 # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
                 depth_image = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
 
@@ -225,15 +199,19 @@ class RealSenseCameraNode(object):
                 color_image_msg.header.frame_id = self.frame_id
                 color_image_msg.header.frame_id = self.frame_id
 
-                # Publish images
-                self.imu_pub.publish(imu_msg)
+                # Publish messages
+                if self.enable_imu:
+                    self.imu_pub.publish(imu_msg)
                 self.rgb_pub.publish(color_image_msg)
                 self.depth_pub.publish(depth_image_msg)
 
         finally:
-            self.pipeline.stop()
+            self.camera.shutdown()
 
 if __name__ == "__main__":
     rs_camera_node = RealSenseCameraNode()
-    rs_camera_node.run()
+    try:
+        rs_camera_node.run()
+    except rospy.ROSInterruptionException:
+        pass
     

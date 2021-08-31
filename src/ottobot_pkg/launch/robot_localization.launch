@@ -1,27 +1,6 @@
 <launch>
-    <node pkg="robot_localization" type="ekf_localization_node" name="ekf_localization_global" clear_params="true">
-    <param name="frequency" value="30"/>
-    <param name="sensor_timeout" value="2"/>
-    <param name="map_frame" value="map"/>
-    <param name="odom_frame" value="odom"/>
-    <param name="base_link_frame" value="base_link"/>
-    <param name="world_frame" value="odom"/>
-    
-    <param name="imu0" value="/ottobot/realsense_camera/imu"/>
-    <rosparam param="imu0_config">[false, false, false,
-                                   true,  true,  true,
-                                   false, false, false,
-                                   true, true, true,
-                                   true,  true,  true]</rosparam>
-    <param name="imu0_differential" value="true"/>
-    <param name="imu0_remove_gravitational_acceleration" value="true"/>
-    <!-- <param name="two_d_mode" value="true"/> -->
-  </node>
-  <!-- <node pkg="robot_localization" type="navsat_transform_node"
-      name="navsat_transform_node"  respawn="true" output="screen">
-    <param name="magnetic_declination_radians" value="0.157"/>
-    <param name="yaw_offset" value="1.570796327"/>
-    <remap from="/imu/data" to="/imuData"/>
-    <remap from="/gps/fix" to="/gpsData"/>
-  </node> -->
+    <node pkg="ottobot_pkg" type="qr_detector_node.py" name="qr_tracker" ns="ottobot" output="screen">
+        <param name="img_in" value="/ottobot/realsense_camera/raw/rgb_image"/>
+        <param name="img_out" value="/ottobot/qr_tracker/image"/>
+    </node>
 </launch>
