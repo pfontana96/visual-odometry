@@ -21,17 +21,18 @@ def quaternion_from_euler(roll, pitch, yaw):
 
     return q
 
-def is_rotation_matrix(R: np.ndarray):
-    assert R.shape == (3,3), "Not valid Rotation matrix, shape should be (3,3) got {} instead".format(R.shape)
-    should_be_identity = np.dot(R.T, R)
-    n = np.linalg.norm(np.identity(3, dtype=R.dtype) - should_be_identity)
-    return n < 1e-6
+def quaternion_from_aa(rot_vec):
+    """
+    Converts axis angle representation to quaternion (w in last place)
+    quat = [x, y, z, w]
+    """
+    a2 = np.linalg.norm(rot_vec)/2 # angle/2
+    sin_a2 = np.sin(a2) # sin(angle/2)
 
-def rotmat_to_euler(R):
-    assert(is_rotation_matrix(R))
-    sy = np.sqrt(R[0,0]**2, R[1,0]**2)
-    singular = sy < 1e-6
+    q = [0] * 4
+    q[0] = rot_vec[0] * sin_a2
+    q[1] = rot_vec[1] * sin_a2
+    q[2] = rot_vec[2] * sin_a2
+    q[3] = np.cos(a2)
 
-    if not singular:
-        ro
-    else:
+    return q
