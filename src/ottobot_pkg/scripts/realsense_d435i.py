@@ -90,6 +90,7 @@ class RealsenseD435i(object):
         frame = None
         if self.enable_depth:
             frame = self.profile.get_stream(rs.stream.depth)
+            depth_scale = self.profile.get_device().first_depth_sensor().get_depth_scale()
         elif self.enable_rgb:
             frame = self.profile.get_stream(rs.stream.color)
         
@@ -108,7 +109,7 @@ class RealsenseD435i(object):
                                   [0,             0,              1]])
         coeffs = np.array(intrinsics.coeffs)
 
-        return camera_matrix, coeffs
+        return camera_matrix, coeffs, depth_scale
 
     def shutdown(self):
         if self.imu_pipeline is not None:

@@ -6,6 +6,7 @@ from geometry_msgs.msg import PoseStamped
 from cv_bridge import CvBridge, CvBridgeError
 
 from utils import quaternion_from_aa
+from kalman_filter import KalmanFilter6DOF
 
 import cv2
 import numpy as np
@@ -54,7 +55,7 @@ class ArucoMarker(object):
         
         return image
 
-class QRDetectorNode(object):
+class ArucoDetectorNode(object):
     def __init__(self, debug=False):
         self.name = rospy.get_param("~name", "qr_detector")
         if debug:
@@ -78,11 +79,14 @@ class QRDetectorNode(object):
         self.bridge = CvBridge()
         self.image = None
         self.stamp = None
-        self.frame_id = None
+        self.frame_id = rospy.get_param("~frame_id", "/map")
 
         self.detected_marker = None
 
         self.rate = rospy.Rate(frame_rate) # Hz
+
+        # Create Kalman Filter
+        self.KF = KalmanFilter6DOF(1/frame_rate)
 
         # Using OpenCV and ArUco codes 
         self.aruco_dict = cv2.aruco.Dictionary_get(cv2.aruco.DICT_6X6_50)
@@ -106,7 +110,6 @@ class QRDetectorNode(object):
         try:
            self.image = self.bridge.imgmsg_to_cv2(data, "passthrough").astype(np.uint8)
            self.stamp = data.header.stamp
-           self.frame_id = data.header.frame_id
         except CvBridgeError as e:
             rospy.logerr(e)
             return
@@ -136,13 +139,27 @@ class QRDetectorNode(object):
                                                            rot_vec.reshape(-1))
 
     def run(self):
+        target = PoseStamped()
         while not rospy.is_shutdown():
+            now = rospy.get_rostime()
+            # Kalman Filter prediction step
+            tvec, q = self.KF.predict()
+
             if self.image is not None:
                 image = deepcopy(self.image)
                 if self.detected_marker is not None:
+                    # We draw the marker corners
                     image = self.detected_marker.draw_marker(image,
-                                                             self.camera_matrix,
-                                                             self.coeffs)
+                                                            self.camera_matrix,
+                                                            self.coeffs)
+                    
+                    # We update the Kalman Filter
+                    measurement = np.empty((6,1), dtype=np.float32)
+                    measurement[:3] = self.detected_marker.t.reshape(-1,1)
+                    measurement[3:] = self.detected_marker.r.reshape(-1,1)
+ 
+                    tvec, q = self.KF.correct(measurement)
+
                 # Prepare ROS message (modified image)
                 try:
                     image = self.bridge.cv2_to_imgmsg(image.astype(np.int8), encoding="passthrough")
@@ -154,38 +171,31 @@ class QRDetectorNode(object):
 
                 if self.img_pub.get_num_connections():             
                     self.img_pub.publish(image)
-                else:
-                    rospy.logwarn("No nodes subscribed to {}".format(self.img_pub.name))
-                
-                # Prepare ROS message (target pose)
-                detected_marker = deepcopy(self.detected_marker)
-                if detected_marker is not None:
-                    t, q = detected_marker.get_pose()
-                    target = PoseStamped()
-                    target.header.stamp = self.stamp
-                    target.header.frame_id = self.frame_id
-                    target.pose.position.x = t[0]
-                    target.pose.position.y = t[1]
-                    target.pose.position.z = t[2]
-                    target.pose.orientation.x = q[0]
-                    target.pose.orientation.y = q[1]
-                    target.pose.orientation.z = q[2]
-                    target.pose.orientation.w = q[3]
 
-                    if self.pose_pub.get_num_connections():
-                        self.pose_pub.publish(target)
+            # Prepare ROS message (target pose)
+            target.header.stamp = now
+            target.header.frame_id = self.frame_id
+            target.pose.position.x = tvec[0]
+            target.pose.position.y = tvec[1]
+            target.pose.position.z = tvec[2]
+            target.pose.orientation.x = q[0]
+            target.pose.orientation.y = q[1]
+            target.pose.orientation.z = q[2]
+            target.pose.orientation.w = q[3]
 
-                # Reset values
-                self.image = None
-                self.detected_marker = None
-                self.stamp = None
-                self.frame_id = None
+            if self.pose_pub.get_num_connections():
+                self.pose_pub.publish(target)
+
+            # Reset values
+            self.image = None
+            self.detected_marker = None
+            self.stamp = None
 
             self.rate.sleep()
 
 if __name__ == "__main__":
-    qr_tracker = QRDetectorNode(True)
+    qr_tracker = ArucoDetectorNode(True)
     try:
         qr_tracker.run()
-    except rospy.ROSInterruptionException:
-        pass 
+    except rospy.ROSInterruptException as e:
+        rospy.logerr(e)

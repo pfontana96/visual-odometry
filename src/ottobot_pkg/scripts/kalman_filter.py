@@ -1,4 +1,7 @@
 import numpy as np
+from cv2 import KalmanFilter
+
+from utils import quaternion_from_aa
 
 class KalmanFilter6DOF(object):
     """
@@ -6,20 +9,15 @@ class KalmanFilter6DOF(object):
     """
     def __init__(self, dt):
         
-        self.dt = dt
-
-        # state_vector = [x, y, z, x', y', z', x'', y'', z'', 
-        #                 a_x, a_y, a_z, a_x', a_y', a_z', a_x'', a_y'', a_z''] 
-        # where (a_x, a_y, a_z) is the axis-angle representation of rotation
+        """
+        dt: [float] Sampling time in seconds
+        """
         n_states = 18
         n_measurements = 6
         n_inputs = 0
+        self.filter = KalmanFilter(n_states, n_measurements, n_inputs)
 
-
-        # Initial state
-        self.x = np.zeros((n_states, 1), dtype=float)
-
-        # State transition (dynamic model with acceleration)
+        # Dynamic Model
         # [1 0 0 dt  0  0 dt2   0   0 0 0 0  0  0  0   0   0   0]
         # [0 1 0  0 dt  0   0 dt2   0 0 0 0  0  0  0   0   0   0]
         # [0 0 1  0  0  dt   0  0 dt2 0 0 0  0  0  0   0   0   0]
@@ -38,155 +36,110 @@ class KalmanFilter6DOF(object):
         # [0 0 0  0  0  0   0   0   0 0 0 0  0  0  0   1   0   0]
         # [0 0 0  0  0  0   0   0   0 0 0 0  0  0  0   0   1   0]
         # [0 0 0  0  0  0   0   0   0 0 0 0  0  0  0   0   0   1]
-        self.A = np.eye(n_states, dtype=float)
 
-        # Position
-        self.A[0,3] = dt
-        self.A[1,4] = dt
-        self.A[2,5] = dt
-        self.A[3,6] = dt
-        self.A[4,7] = dt
-        self.A[5,8] = dt
+        # Transition matrix
+        t_matrix = np.eye(n_states, dtype=np.float32)
         
-        self.A[0,6] = dt**2/2
-        self.A[1,7] = dt**2/2
-        self.A[2,8] = dt**2/2
+        # Position
+        t_matrix[0,3] = dt
+        t_matrix[1,4] = dt
+        t_matrix[2,5] = dt
+        t_matrix[3,6] = dt
+        t_matrix[4,7] = dt
+        t_matrix[5,8] = dt
+        
+        t_matrix[0,6] = dt**2/2
+        t_matrix[1,7] = dt**2/2
+        t_matrix[2,8] = dt**2/2
 
         # Orientation
-        self.A[9,12]  = dt
-        self.A[10,13] = dt
-        self.A[11,14] = dt
-        self.A[12,15] = dt
-        self.A[13,16] = dt
-        self.A[14,17] = dt
+        t_matrix[9,12]  = dt
+        t_matrix[10,13] = dt
+        t_matrix[11,14] = dt
+        t_matrix[12,15] = dt
+        t_matrix[13,16] = dt
+        t_matrix[14,17] = dt
         
-        self.A[9,15]  = dt**2/2
-        self.A[10,16] = dt**2/2
-        self.A[11,17] = dt**2/2
+        t_matrix[9,15]  = dt**2/2
+        t_matrix[10,16] = dt**2/2
+        t_matrix[11,17] = dt**2/2
 
-        # Measurement mapping matrix
+        self.filter.transitionMatrix = t_matrix
+
+        # Measurement model
         # [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
         # [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
         # [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
         # [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0]
         # [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0]
         # [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0]
-        self.H = np.zeros((n_measurements, n_states), dtype=float)
-        self.H[0,0] = 1  # x
-        self.H[1,1] = 1  # y
-        self.H[2,2] = 1  # z
-        self.H[3,9]  = 1 # a_x
-        self.H[4,10] = 1 # a_y
-        self.H[5,11] = 1 # a_z
+        m_matrix = np.zeros((n_measurements, n_states), dtype=np.float32)
+        m_matrix[0,0] = 1  # x
+        m_matrix[1,1] = 1  # y
+        m_matrix[2,2] = 1  # z
+        m_matrix[3,9]  = 1 # roll
+        m_matrix[4,10] = 1 # pitch
+        m_matrix[5,11] = 1 # yaw
 
-        # Process Noise Covariance and Measurement Noise Covariance
-        # values taken from https://docs.opencv.org/3.3.0/dc/d2c/tutorial_real_time_pose.html
-        self.Q = np.eye(n_states, dtype=float)*1e-5
-        self.R = np.eye(n_measurements, dtype=float)*1e-4
+        self.filter.measurementMatrix = m_matrix
 
-        # Initial Covariance matrix
-        self.P = np.eye(n_states, dtype=float)
+        # Process Noise
+        self.filter.processNoiseCov = np.eye(n_states, dtype=np.float32)*1e-5
 
-    def predict(self):
-        # Update time step
-        self.x = np.dot(self.A, self.x)
+        # Measurement Noise
+        self.filter.measurementNoiseCov = np.eye(n_measurements, dtype=np.float32)*1e-4
 
-        # Calculate error covariance
-        self.P = np.dot(np.dot(self.A, self.P), self.A.T) + self.Q 
-
-        return self.x[:3], self.x[9:12] # translation and rotation
-
-    def update(self, z):
+    def predict(self, quaternion=True):
         """
-        z: (np.array(float)) array of shape (6,1) containing measured [x, y, z, a_x, a_y, a_z]
-        """
-        assert(type(z) == np.ndarray), "z should be a numpy array"
-        assert(z.shape == (6,1)), "Expected shape (6,1), got {} instead".format(z.shape)
-        S = np.dot(np.dot(self.H, self.P), self.H.T) + self.R 
-
-        # Calculate Kalman gain
-        K = np.dot(np.dot(self.P, self.H.T), np.linalg.inv(S))
-
-        self.x = np.round(self.x + np.dot(K, (z - np.dot(self.H, self.x))))
-        I = np.eye(self.H.shape[1])
-
-        # Update error covariance matrix
-        self.P = np.dot((I - (K*self.H)), self.P)
-
-        return self.x[:3], self.x[9:12] # translation and rotation
+        Performs prediction of Kalman filter
         
-class KalmanFilter(object):
-    def __init__(self, dt, u_x, u_y, std_acc, x_std_meas, y_std_meas):
+        Argeuments:
+        -----------
+        quaternion: [bool] If True then target's frame rotation is presented by its 
+                           quaternion, otherwise axis-angle representation is used
+
+        Return:
+        ------
+        tvec: [np.ndarray] Array containing translation of target's reference frame
+                           [x,y,z]
+        rvec: [np.ndarray] Array containing the quaternion representation of the 
+                           orientation of target's reference frame [x,y,z,w] if 
+                           quaternion is True, axis-angle representation otherwise
         """
-        Numpy implementation of a Kalman filter
+        assert type(quaternion) == bool, "'quaternion' should be a boolean"
+        estimate = self.filter.predict()
+        if quaternion is True:
+            return (estimate[:3], np.array(quaternion_from_aa(estimate[9:12]), dtype=np.float32))
+        else:
+            return (estimate[:3], estimate[9:12])
+    
+    def correct(self, z, quaternion=True):
+        """
+        Performs update step of Kalman Filter.
+
         Arguments:
-        ---------
-        dt: [float] Sampling time in seconds
-        u_x: [float] Acceleration on x-axis
-        u_y: [float] Acceleration on y-axis
-        std_acc: [float] Process noise magnitude
-        x_std_meas: [float] Standard deviation of the measurement in x-direction
-        y_std_meas: [float] Standard deviation of the measurement in y-direction
+        ----------
+        z: [np.ndarray] Array (6,1) containing [x, y, z, a_x, a_y, a_z] where (a_x, a_y, a_z)
+                        is the axis-angle representation of the measured reference frame
+        quaternion: [bool] If True then target's frame rotation is presented by its 
+                           quaternion, otherwise axis-angle representation is used
+
+        Return:
+        ------
+        tvec: [np.ndarray] Array containing translation of target's reference frame
+                           [x,y,z]
+        rvec: [np.ndarray] Array containing the quaternion representation of the 
+                           orientation of target's reference frame [x,y,z,w] if 
+                           quaternion is True, axis-angle representation otherwise
         """
-        self.dt = dt
-
-        # Control input variables
-        self.u = np.array([[u_x], [u_y]])
-        
-        # Initial state
-        # x = [pos_x, pos_y, vel_x, vel_y]
-        self.x = np.zeros((4,1))
-        
-        # State transition
-        self.A = np.eye(4)
-        self.A[0,2] = self.dt
-        self.A[1,3] = self.dt
-
-        # Control input matrix
-        self.B = np.array([[self.dt**2/2, 0],
-                           [0, self.dt**2/2],
-                           [self.dt, 0],
-                           [0, self.dt]])
-
-        # Measurement mapping matrix
-        self.H = np.array([[1, 0, 0, 0],
-                           [0, 1, 0, 0]])
-
-        # Initial process noise covariance
-        self.Q = std_acc**2 * np.array([[self.dt**4/4, 0, self.dt**3/2, 0],
-                                        [0, self.dt**4/4, 0, self.dt**3/2],
-                                        [self.dt**3/2, 0, self.dt**2, 0],
-                                        [0, self.dt**3/2, 0, self.dt**2]])
-
-        # Initial measurement noise covariance
-        self.R = np.array([[x_std_meas**2, 0],
-                           [0, y_std_meas**2]])
-
-        # Initial covariance matrix
-        self.P = np.eye(self.A.shape[1])
-
-    def predict(self):
-        # Update time step
-        self.x = np.dot(self.A, self.x) + np.dot(self.B, self.u)
-
-        # Calculate error covariance
-        self.P = np.dot(np.dot(self.A, self.P), self.A.T) + self.Q 
-
-        return self.x[0:2]
-
-    def update(self, z):
-        S = np.dot(np.dot(self.H, self.P), self.H.T) + self.R 
-
-        # Calculate Kalman gain
-        K = np.dot(np.dot(self.P, self.H.T), np.linalg.inv(S))
-
-        self.x = np.round(self.x + np.dot(K, (z - np.dot(self.H, self.x))))
-        I = np.eye(self.H.shape[1])
-
-        # Update error covariance matrix
-        self.P = (I - (K*self.H)) * self.P
-
-        return self.x[0:2]
+        assert type(quaternion) == bool, "'quaternion' should be a boolean"
+        assert type(z) == np.ndarray, "'z' should be a np.ndarray, got {} instead".format(type(z))
+        assert (z.shape == (6,1)) or (z.shape == (1,6)), "'z' shape should be (6,1) or (1,6), got {} instead".format(z.shape)
+        estimate = self.filter.correct(z)
+        if quaternion is True:
+            return (estimate[:3], np.array(quaternion_from_aa(estimate[9:12]), dtype=np.float32))
+        else:
+            return (estimate[:3], estimate[9:12])
 
 if __name__ == "__main__":
     import cv2
@@ -203,93 +156,10 @@ if __name__ == "__main__":
     enable_imu = False
     create_pc = False
     fps = 15
+
     # Create Kalman Filter
+    KF = KalmanFilter6DOF(1/fps)
 
-    n_states = 18 # Nb of states
-    n_measurements = 6 # Nb of measurements
-    n_inputs = 0 # Nb of action control
-    dt = 1/fps
-
-    KF = cv2.KalmanFilter(n_states, n_measurements, n_inputs)
-
-    # Dynamic Model
-    # [1 0 0 dt  0  0 dt2   0   0 0 0 0  0  0  0   0   0   0]
-    # [0 1 0  0 dt  0   0 dt2   0 0 0 0  0  0  0   0   0   0]
-    # [0 0 1  0  0  dt   0  0 dt2 0 0 0  0  0  0   0   0   0]
-    # [0 0 0  1  0  0  dt   0   0 0 0 0  0  0  0   0   0   0]
-    # [0 0 0  0  1  0   0  dt   0 0 0 0  0  0  0   0   0   0]
-    # [0 0 0  0  0  1   0   0  dt 0 0 0  0  0  0   0   0   0]
-    # [0 0 0  0  0  0   1   0   0 0 0 0  0  0  0   0   0   0]
-    # [0 0 0  0  0  0   0   1   0 0 0 0  0  0  0   0   0   0]
-    # [0 0 0  0  0  0   0   0   1 0 0 0  0  0  0   0   0   0]
-    # [0 0 0  0  0  0   0   0   0 1 0 0 dt  0  0 dt2   0   0]
-    # [0 0 0  0  0  0   0   0   0 0 1 0  0 dt  0   0 dt2   0]
-    # [0 0 0  0  0  0   0   0   0 0 0 1  0  0 dt   0   0 dt2]
-    # [0 0 0  0  0  0   0   0   0 0 0 0  1  0  0  dt   0   0]
-    # [0 0 0  0  0  0   0   0   0 0 0 0  0  1  0   0  dt   0]
-    # [0 0 0  0  0  0   0   0   0 0 0 0  0  0  1   0   0  dt]
-    # [0 0 0  0  0  0   0   0   0 0 0 0  0  0  0   1   0   0]
-    # [0 0 0  0  0  0   0   0   0 0 0 0  0  0  0   0   1   0]
-    # [0 0 0  0  0  0   0   0   0 0 0 0  0  0  0   0   0   1]
-
-    # Transition matrix
-    t_matrix = np.eye(n_states, dtype=np.float32)
-    
-    # Position
-    t_matrix[0,3] = dt
-    t_matrix[1,4] = dt
-    t_matrix[2,5] = dt
-    t_matrix[3,6] = dt
-    t_matrix[4,7] = dt
-    t_matrix[5,8] = dt
-    
-    t_matrix[0,6] = dt**2/2
-    t_matrix[1,7] = dt**2/2
-    t_matrix[2,8] = dt**2/2
-
-    # Orientation
-    t_matrix[9,12]  = dt
-    t_matrix[10,13] = dt
-    t_matrix[11,14] = dt
-    t_matrix[12,15] = dt
-    t_matrix[13,16] = dt
-    t_matrix[14,17] = dt
-    
-    t_matrix[9,15]  = dt**2/2
-    t_matrix[10,16] = dt**2/2
-    t_matrix[11,17] = dt**2/2
-
-    KF.transitionMatrix = t_matrix
-
-    # Measurement model
-    # [1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
-    # [0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
-    # [0 0 1 0 0 0 0 0 0 0 0 0 0 0 0 0 0 0]
-    # [0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0 0]
-    # [0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0 0]
-    # [0 0 0 0 0 0 0 0 0 0 0 1 0 0 0 0 0 0]
-    m_matrix = np.zeros((n_measurements, n_states), dtype=np.float32)
-    m_matrix[0,0] = 1  # x
-    m_matrix[1,1] = 1  # y
-    m_matrix[2,2] = 1  # z
-    m_matrix[3,9]  = 1 # roll
-    m_matrix[4,10] = 1 # pitch
-    m_matrix[5,11] = 1 # yaw
-
-    KF.measurementMatrix = m_matrix
-
-    # Process Noise
-    KF.processNoiseCov = np.eye(n_states, dtype=np.float32)*1e-5
-
-    # Measurement Noise
-    KF.measurementNoiseCov = np.eye(n_measurements, dtype=np.float32)*1e-4
-
-    # KF = KalmanFilter6DOF(1/fps)
-
-    # Error Covariance
-    # KF.errorCovPost = np.eye()
-
-    # logging.getLogger().setLevel(logging.DEBUG)
     logging.basicConfig(format='%(asctime)s,%(msecs)d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s',
                         datefmt='%Y-%m-%d:%H:%M:%S',
                         level=logging.DEBUG)
@@ -344,8 +214,7 @@ if __name__ == "__main__":
                                                             parameters=aruco_params)
             
             # Kalman Filter steps
-            # tvec, rvec = KF.predict()
-            estimate = KF.predict()
+            tvec, rvec = KF.predict(False)
             
             # At least one code detected
             if len(corners) > 0:
@@ -368,11 +237,6 @@ if __name__ == "__main__":
                             # Draw detected contours only
                             image = detected_marker.draw_marker(image)
 
-                            # # Correct Kalman
-                            # measurement = np.array(6(6,1), dtype=float)
-                            # measurement[:3] = detected_marker.t
-                            # measurement[3:] = detected_marker.r 
-                            # KF.correct(measurement)   
             # Update Kalman
             # We update the filter with a current valid measurement if there's any
             # the last one otherwise
@@ -380,12 +244,9 @@ if __name__ == "__main__":
                 measurement = np.empty((6,1), dtype=np.float32)
                 measurement[:3] = detected_marker.t.reshape(-1,1)
                 measurement[3:] = detected_marker.r.reshape(-1,1)
-                # tvec, rvec = KF.update(measurement)
-                estimate = KF.correct(measurement)
+                tvec, rvec = KF.correct(measurement, False)
 
              # Draw Kalman's estimated axis
-            tvec = estimate[:3]
-            rvec = estimate[9:12]
             image = cv2.aruco.drawAxis(image, 
                                        camera_matrix,
                                        coeffs,
