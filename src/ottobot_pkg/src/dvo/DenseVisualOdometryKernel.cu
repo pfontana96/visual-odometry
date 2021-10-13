@@ -1,10 +1,44 @@
 #include <DenseVisualOdometryKernel.cuh>
 
+/*--------------------------------   KERNELS WRAPPERS   -------------------------------*/
+void call_step_kernel(  unsigned char* gray,
+                        unsigned char* gray_prev,
+                        unsigned short* depth_prev,
+                        float* residuals,
+                        const float T[4][4],
+                        const float cam_mat[3][3],
+                        const float scale,
+                        const int width,
+                        const int height)
+{
+    // We can use pointers passed by CPU process because we're using Unified Memory     
+    // Valid because on Nano devices CPU and GPU share physical memory
+
+    // Calculate Nb of threads per block and blocks per grid
+    int gx = std::ceil((float) width/CUDA_BLOCKSIZE), gy = std::ceil((float) height/CUDA_BLOCKSIZE);
+    dim3 block(CUDA_BLOCKSIZE, CUDA_BLOCKSIZE), grid(gx, gy);
+    printf("(w: %d, h: %d) Grid: (%d, %d) | Block: (%d, %d)", width, height, gx, gy, CUDA_BLOCKSIZE, CUDA_BLOCKSIZE);
+
+    step_kernel<<<grid, block>>>(gray,
+                                 gray_prev,
+                                 depth_prev,
+                                 residuals,
+                                 T,
+                                 cam_mat,
+                                 scale,
+                                 width,
+                                 height);
+
+    // Check for CUDA errors after launching the kernel
+    HANDLE_CUDA_ERROR(cudaGetLastError());
+    HANDLE_CUDA_ERROR(cudaDeviceSynchronize());
+}                        
+
 /*------------------------------------   KERNELS   -----------------------------------*/
 
 __global__ void step_kernel(const unsigned char* gray,
                             const unsigned char* gray_prev,
-                            const unsigned char* depth_prev,
+                            const unsigned short* depth_prev,
                             float* residuals,
                             const float T[4][4],
                             const float cam_mat[3][3],
@@ -12,22 +46,26 @@ __global__ void step_kernel(const unsigned char* gray,
                             const int width,
                             const int height)
 {
-    int tidx = threadIdx.x + blockIdx.x * blockDim.x;
-    int tidy = threadIdx.y + blockIdx.y * blockDim.y;
+    int tidx = threadIdx.x + (blockIdx.x * blockDim.x);
+    int tidy = threadIdx.y + (blockIdx.y * blockDim.y);
     
-    if(tidx<width && tidy<height)
-    {
-        residuals[tidy*width + tidx] = compute_residual(gray,
-                                                        tidx,
-                                                        tidy,
-                                                        gray_prev[tidy*width + tidx],
-                                                        depth_prev[tidy*width + tidx],
-                                                        T,
-                                                        cam_mat,
-                                                        scale,
-                                                        width,
-                                                        height);
-    }
+    // Check bounds
+    if(tidx>=width || tidy>=height)
+        return;
+
+    int pixel = (tidy*width) + tidx;
+    residuals[pixel] = (float) (gray[pixel]);
+    // residuals[pixel] = compute_residual(gray,
+    //                                     tidx,
+    //                                     tidy,
+    //                                     gray_prev[pixel],
+    //                                     depth_prev[pixel],
+    //                                     T,
+    //                                     cam_mat,
+    //                                     scale,
+    //                                     width,
+    //                                     height);
+    
 }
 
 /*------------------------------------  FUNCTIONS  -----------------------------------*/
@@ -79,7 +117,7 @@ __device__ float compute_residual(const unsigned char* gray,
                                   const int tidx,
                                   const int tidy,
                                   const unsigned char gray_prev,
-                                  const unsigned char depth_prev,
+                                  const unsigned short depth_prev,
                                   const float T[4][4],
                                   const float cam_mat[3][3],
                                   const float scale,

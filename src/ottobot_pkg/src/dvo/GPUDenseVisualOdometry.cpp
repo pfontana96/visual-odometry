@@ -1,9 +1,10 @@
 #include <GPUDenseVisualOdometry.h>
 
 namespace otto{
-    GPUDenseVisualOdometry::GPUDenseVisualOdometry(ros::NodeHandle& nh)
+    GPUDenseVisualOdometry::GPUDenseVisualOdometry(const int width, const int height)
     {
-        nh_ = nh;
+        width_ = width;
+        height_ = height;
 
         first_frame = true;
 
@@ -13,20 +14,63 @@ namespace otto{
                           0,        0,        1;
         
         scale = 0.001;
+
+        int gray_size = width*height*sizeof(char), depth_size = width*height*sizeof(short);
+        int res_size = width*height*sizeof(float);
+        #if (DVO_USE_CUDA > 0)
+            std::cout << "Allocating memory" << std::endl;
+            HANDLE_CUDA_ERROR(cudaSetDeviceFlags(cudaDeviceMapHost));
+            HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &gray_ptr, gray_size));
+            HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &gray_prev_ptr, gray_size));
+            HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &depth_prev_ptr, gray_size));
+            HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &res_ptr, res_size));
+            std::cout << "CUDA Unified memory allocated" << std::endl;
+        #else
+            gray_ptr = std::malloc(gray_size);
+            gray_prev_ptr = std::malloc(gray_size);
+            depth_prev_ptr = std::malloc(depth_size);
+            res_ptr = std::malloc(res_size);
+        #endif
+        gray = cv::Mat(height, width, CV_8U, gray_ptr);
+        gray_prev = cv::Mat(height, width, CV_8U, gray_ptr);
+        depth_prev = cv::Mat(height, width, CV_16U, depth_prev_ptr);
+        residuals = cv::Mat(height, width, CV_32F, res_ptr);
+
+        #if (DVO_DEBUG > 0)
+            cv::namedWindow("Gray", cv::WINDOW_AUTOSIZE);
+            cv::moveWindow("Gray", 0, 0);
+            cv::namedWindow("Depth", cv::WINDOW_AUTOSIZE);
+            cv::moveWindow("Depth", width_+10, 0);
+            cv::namedWindow("Residuals", cv::WINDOW_AUTOSIZE);
+            cv::moveWindow("Residuals", 2*(width_+10), 0);
+        #endif
     }
 
     GPUDenseVisualOdometry::~GPUDenseVisualOdometry()
     {
-
+        std::cout << "Exited dtor" << std::endl;
+        #if (DVO_USE_CUDA > 0)
+            HANDLE_CUDA_ERROR(cudaFree(gray_ptr));
+            HANDLE_CUDA_ERROR(cudaFree(gray_prev_ptr));
+            HANDLE_CUDA_ERROR(cudaFree(depth_prev_ptr));
+            HANDLE_CUDA_ERROR(cudaFree(res_ptr));
+        #else
+            std::free(gray_ptr);
+            std::free(gray_prev_ptr);
+            std::free(depth_prev_ptr);
+            std::free(res_ptr);
+        #endif
     }
 
-    cv::Mat GPUDenseVisualOdometry::step(const cv::Mat& color, const cv::Mat& depth)
+    cv::Mat GPUDenseVisualOdometry::step(cv::Mat& color, cv::Mat& depth_in)
     {
-        // Convert color image to grayscale
-        cv::cvtColor(color, gray, cv::COLOR_BGR2GRAY);
+        assert(("Image should have the same resolution!", color.cols == depth_in.cols && color.rows == depth_in.rows));
 
-        int width = gray.cols, height = gray.rows;
-        cv::Mat residuals(height, width, CV_32F);
+        // Convert color image to grayscale and depth image to 16 bits depth
+
+        cv::cvtColor(color, gray, cv::COLOR_BGR2GRAY);
+        cv::Mat depth(height_, width_, CV_16U);
+        depth_in.convertTo(depth, CV_16U);
 
         // Initial pose estimation
         Eigen::Matrix<float, 4, 4, Eigen::RowMajor> T = Eigen::Matrix4f::Identity();
@@ -35,54 +79,43 @@ namespace otto{
         if(!first_frame)
         {
             // Check for CUDA
-            #ifdef __CUDACC__              
-
-                // Get device pointers from host memory. No allocation or memcpy
-                // Valid because on Nano devices CPU and GPU share physical memory
-                unsigned char* gray_d_ptr, gray_last_d_ptr, depth_last_d_ptr;
-                cudaHostGetDevicePointer((void**) &gray_d_ptr, (void*) gray.data, 0);
-                cudaHostGetDevicePointer((void**) &gray_last_d_ptr, (void*) gray_last.data, 0);
-                cudaHostGetDevicePointer((void**) &depth_last_d_ptr, (void*) depth_last.data, 0);
-
-                float* residuals_d_ptr;
-                cudaHostGetDevicePointer((void**) &residuals_d_ptr, (void*) residuals.data, 0);
-
+            #if(DVO_USE_CUDA > 0)              
                 float T_d[4][4], cam_mat_d[3][3];
                 std::copy(T.data(), T.data() + 16, *T_d);
-                std::copy(cam_mat.data(), cam_mat.data() + 9, *cam_mat_d)
+                std::copy(cam_mat.data(), cam_mat.data() + 9, *cam_mat_d);
 
-                // Calculate Nb of threads per block and blocks per grid
-                int dx = (int) width/CUDA_BLOCK_SIZE;
-                int mx = width%CUDA_BLOCK_SIZE;
-                int dy = (int) height/CUDA_BLOCK_SIZE;
-                int my = height%CUDA_BLOCK_SIZE;
-
-                dx = mx > 0 ? dx+1, dx;
-                dy = my > 0 ? dy+1, dy;
-                dim3 blockdim(CUDA_BLOCK_SIZE, CUDA_BLOCK_SIZE), griddim(dx, dy);
-
-                // Call Residuals Kernel
-                step_kernel<<griddim, blockdim>>(gray_d_ptr,
-                                                 gray_last_d_ptr,
-                                                 depth_last_d_ptr,
-                                                 residuals_d_ptr,
-                                                 T_d,
-                                                 cam_mat_d,
-                                                 scale,
-                                                 width,
-                                                 height);
-
-
-
+                // Call CUDA Kernel
+                call_step_kernel(gray_ptr,
+                                 gray_prev_ptr,
+                                 depth_prev_ptr,
+                                 res_ptr,
+                                 T_d,
+                                 cam_mat_d,
+                                 scale,
+                                 width_,
+                                 height_);
+                                 
             #endif
+        }
+        else
+        {
+            first_frame = false;
         }
 
         // Assign last values
-        gray_last = gray;
-        depth_last = depth;
+        // gray_last = gray;
+        // depth_last = depth;
+        gray.copyTo(gray_prev);
+        depth.copyTo(depth_prev); 
 
-        if(first_frame)
-            first_frame = false;
+        #if (DVO_DEBUG > 0)
+            // Display images
+            cv::imshow("Gray", gray);
+            cv::imshow("Depth", depth);
+            cv::Mat residuals_scaled;
+            cv::convertScaleAbs(residuals, residuals_scaled);
+            cv::imshow("Residuals", residuals_scaled);
+        #endif
 
         return residuals;
     }
