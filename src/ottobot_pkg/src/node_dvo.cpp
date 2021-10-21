@@ -59,12 +59,6 @@ int main(int argc, char** argv)
         cv::Mat depth = cv::imread(imgs_path + "/depth_" + std::to_string(i) + ".png", 
                                    cv::IMREAD_ANYDEPTH);
 
-        // // Dummy data
-        // unsigned char data[27] = {1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18,
-        //                          19, 20, 21, 22, 23, 24, 25, 26, 27};
-        // cv::Mat color(3, 3, CV_8UC3, data), depth(3, 3, CV_16U, data), gray;
-        // cv::cvtColor(color, gray, cv::COLOR_BGR2GRAY) ;
-
         if(color.empty() || depth.empty())
         {
             std::cout << "Couldn't read images" << std::endl;
@@ -80,15 +74,6 @@ int main(int argc, char** argv)
         cv::Mat depth_cmap, depth_adj;
         cv::convertScaleAbs(depth, depth_adj, 255/max);
         cv::applyColorMap(depth_adj, depth_cmap, cv::COLORMAP_JET);
-
-        // Show images
-        // cv::imshow("Color", color);
-        // cv::imshow("Depth", depth_cmap);
-
-        // // Wait for second frame for residuals
-        // if(i>1)
-        //     // std::cout << "Residuals: " << residuals << std::endl;
-        //     cv::imshow("Residuals", residuals);
 
         int key = cv::waitKey(1);
         // Check if 'Esc'

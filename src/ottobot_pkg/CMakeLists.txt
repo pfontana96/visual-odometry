@@ -18,7 +18,9 @@ find_package(catkin REQUIRED COMPONENTS
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package(Eigen3 REQUIRED)
-# include_directories(${EIGEN3_INCLUDE_DIR})
+
+# Find manif (Lie's algebra templated library)
+find_package(manif REQUIRED)
 
 # Import OpenCV library
 find_package(OpenCV 4 REQUIRED)
@@ -64,6 +66,7 @@ if(CMAKE_CUDA_COMPILER)
   file(GLOB dvo_gpu_src_files "${CMAKE_CURRENT_LIST_DIR}/src/dvo/*.cu")
   set(DVO_SRC_FILES ${DVO_SRC_FILES} ${dvo_gpu_src_files})
 endif(CMAKE_CUDA_COMPILER)
+# message(STATUS "DVO src: ${DVO_SRC_FILES}")
 
 set(DVO_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include/dvo)
 add_library(dvo ${DVO_SRC_FILES})
@@ -71,6 +74,7 @@ target_include_directories( dvo PUBLIC
   ${DVO_INCLUDE_DIR}
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
+  ${manif_INCLUDE_DIRS}
 )
 if(CMAKE_CUDA_COMPILER)
   set_target_properties(dvo PROPERTIES CUDA_SEPARABLE_COMPILATION ON)

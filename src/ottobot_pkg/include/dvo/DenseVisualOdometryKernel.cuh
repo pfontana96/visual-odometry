@@ -25,7 +25,7 @@ inline void query_devices()
     {
         cudaDeviceProp dev_prop;
         cudaGetDeviceProperties(&dev_prop, i);
-        printf("Found CUDA Capable device %s (%d.%d)", dev_prop.name, 
+        printf("Found CUDA Capable device %s (%d.%d)\n", dev_prop.name, 
                                                        dev_prop.major,
                                                        dev_prop.minor);
     }
@@ -34,29 +34,74 @@ inline void query_devices()
 
 #define CUDA_BLOCKSIZE 32
 
+extern __constant__ float CM[3][3]; // Camera matrix is not expected to change over time
+
 /*--------------------------------   KERNELS WRAPPERS   -------------------------------*/
 
-void call_step_kernel(  unsigned char* gray,
-                        unsigned char* gray_prev,
-                        unsigned short* depth_prev,
-                        float* residuals,
-                        const float T[4][4],
-                        const float cam_mat[3][3],
-                        const float scale,
-                        const int width,
-                        const int height);
+void call_residuals_kernel(     unsigned char* gray,
+                                unsigned char* gray_prev,
+                                unsigned short* depth_prev,
+                                float* residuals,
+                                const float* T,
+                                float scale,
+                                int width,
+                                int height);
+
+void call_weighting_kernel( const float* residuals, 
+                            float* weights,
+                            float* var,
+                            float dof ,
+                            int width, 
+                            int height);
+
+void call_jacobian_kernel(  const unsigned char* gray,
+                            const unsigned short* depth_prev,
+                            float* J,
+                            const float* T,
+                            float scale,
+                            int width,
+                            int height);
 
 /*------------------------------------   KERNELS   -----------------------------------*/
 
-__global__ void step_kernel(const unsigned char* gray,
-                            const unsigned char* gray_prev,
-                            const unsigned short* depth_prev,
-                            float* residuals,
-                            const float T[4][4],
-                            const float cam_mat[3][3],
-                            const float scale,
-                            const int width,
-                            const int height);
+__global__ void residuals_kernel( const unsigned char* gray,
+                                  const unsigned char* gray_prev,
+                                  const unsigned short* depth_prev,
+                                  float* residuals,
+                                  const float* T,
+                                  float scale,
+                                  int width,
+                                  int height);
+
+__global__ void weighting_kernel(const float* residuals, 
+                                 float* weights,
+                                 float var,
+                                 float dof ,
+                                 int width, 
+                                 int height);
+
+__global__ void variance_kernel(const float* residuals,
+                                float var_in,
+                                float* var_out,
+                                float dof,
+                                int width,
+                                int height);
+
+__global__ void jacobian_kernel( const unsigned char* gray,
+                                 const unsigned short* depth_prev,
+                                 const float* gradx,
+                                 const float* grady,
+                                 float* J,
+                                 const float* T,
+                                 float scale,
+                                 int width,
+                                 int height);
+
+__global__ void gradients_kernel(const unsigned char* gray,
+                                 float* gradx,
+                                 float* grady,
+                                 int width,
+                                 int height);
 
 /*------------------------------------  FUNCTIONS  -----------------------------------*/
 
@@ -66,15 +111,10 @@ __device__ float bilinear_interpolation(   const float x,
                                            const int width,
                                            const int height);
 
-__device__ float compute_residual(const unsigned char* gray,
-                                  const int tidx,
-                                  const int tidy,
-                                  const unsigned char gray_prev,
-                                  const unsigned short depth_prev,
-                                  const float T[4][4],
-                                  const float cam_mat[3][3],
-                                  const float scale,
-                                  const int width,
-                                  const int height);
+__device__ float bilinear_interpolation( const float x, 
+                                         const float y, 
+                                         const float* src_img,
+                                         const int width,
+                                         const int height);                                           
 
 #endif
