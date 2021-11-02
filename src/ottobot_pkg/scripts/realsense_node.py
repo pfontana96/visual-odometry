@@ -127,13 +127,13 @@ class RealSenseCameraNode(object):
         imu_msg.angular_velocity_covariance = [self.angular_vel_cov, 0.0, 0.0, 0.0, self.angular_vel_cov, 0.0, 0.0, 0.0, self.angular_vel_cov]
 
         # Get camera intrinsics and dump them in configuration file
-        camera_matrix, coeffs = self.camera.get_intrinsics()
+        camera_matrix, coeffs, scale = self.camera.get_intrinsics()
         config_path = Path(__file__).resolve().parent.parent.joinpath("config")
 
         if config_path.exists() and config_path.is_dir():
             filename = config_path.joinpath(self.calibration_filename).with_suffix('.yaml')
             rospy.loginfo("Dumping camera intrinsics to '{}'..".format(str(filename)))
-            data = {"camera_matrix": camera_matrix.tolist(), "coeffs":coeffs.tolist()}
+            data = {"camera_matrix": camera_matrix.tolist(), "coeffs":coeffs.tolist(), "scale":scale}
 
             with open(filename, 'w') as f:
                 yaml.dump(data, f, Dumper=MyDumper)
@@ -183,12 +183,12 @@ class RealSenseCameraNode(object):
 
                 # Prepare image messages
                 # Apply colormap on depth image (image must be converted to 8-bit per pixel first)
-                depth_image = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
+                # depth_image = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET)
 
                 # Convert images to ROS messages
                 try:
-                    color_image_msg = bridge.cv2_to_imgmsg(color_image.astype(np.int8), encoding="passthrough")
-                    depth_image_msg = bridge.cv2_to_imgmsg(depth_image.astype(np.int8), encoding="passthrough")
+                    color_image_msg = bridge.cv2_to_imgmsg(color_image.astype(np.uint8), encoding="passthrough")
+                    depth_image_msg = bridge.cv2_to_imgmsg(depth_image.astype(np.uint16), encoding="passthrough")
                 except CvBridgeError as e:
                     rospy.logerr(e)
                     continue

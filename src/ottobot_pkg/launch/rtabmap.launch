@@ -1,3 +1,0 @@
-<launch>
-    <node pkg="rtabmap" node="rgbd_odometry" name="visual_odom" ns="ottobot"/>
-</launch>

@@ -13,14 +13,20 @@ find_package(catkin REQUIRED COMPONENTS
   rospy
   sensor_msgs
   std_msgs
+  message_filters
+  tf2
+  tf2_ros
+  pcl_ros
 )
 
 ## System dependencies are found with CMake's conventions
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package(Eigen3 REQUIRED)
 
-# Find manif (Lie's algebra templated library)
-find_package(manif REQUIRED)
+# Find PCL library
+find_package(PCL REQUIRED COMPONENTS common io)
+link_directories(${PCL_LIBRARY_DIRS})
+add_definitions(${PCL_DEFINITIONS})
 
 # Import OpenCV library
 find_package(OpenCV 4 REQUIRED)
@@ -29,6 +35,14 @@ if(OpenCV_FOUND)
 else()
   message(FATAL_ERROR "OpenCV > 4 not found.")
 endif(OpenCV_FOUND)
+
+# Find OpenMP
+find_package(OpenMP)
+if(OpenMP_FOUND)
+  message(STATUS "Found OpenMP")
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
+  set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
+endif(OpenMP_FOUND)
 
 # Enable CUDA
 enable_language(CUDA)
@@ -89,11 +103,16 @@ add_executable(dvo_node src/node_dvo.cpp)
 target_include_directories(dvo_node PRIVATE
   ${catkin_INCLUDE_DIRS}
   ${DVO_INCLUDE_DIR}
+  ${PCL_INCUDE_DIRS}
+  include
 )
-message(STATUS "CUDS_LIBRARIES: ${CUDA_LIBRARIES}")
+
+target_compile_options(dvo_node PRIVATE ${OpenMP_FLAGS})
+
 target_link_libraries(dvo_node 
   ${catkin_LIBRARIES} 
-  ${OpenCV_LIBRARIES} 
+  ${OpenCV_LIBRARIES}
+  ${PCL_LIBRARIES} 
   cudart
   dvo
 )

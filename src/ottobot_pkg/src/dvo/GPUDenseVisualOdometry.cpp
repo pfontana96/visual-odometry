@@ -15,29 +15,20 @@ namespace otto{
         
         scale = 0.001;
 
-        int gray_size = width*height*sizeof(char), depth_size = width*height*sizeof(short);
-        int res_size = width*height*sizeof(float);
-        #if (DVO_USE_CUDA > 0)
-            std::cout << "Allocating memory" << std::endl;
-            HANDLE_CUDA_ERROR(cudaSetDeviceFlags(cudaDeviceMapHost));
-            HANDLE_CUDA_ERROR(cudaMemcpyToSymbol(CM, cam_mat.data(), 9*sizeof(float)));
-            HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &gray_ptr, gray_size));
-            HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &gray_prev_ptr, gray_size));
-            HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &depth_prev_ptr, depth_size));
-            HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &res_ptr, res_size));
-            HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &weights_ptr, res_size));            
-            HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &T_ptr, 16*sizeof(float)));
-            HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &J_ptr, 6*res_size));
-            std::cout << "CUDA Unified memory allocated" << std::endl;
-        #else
-            gray_ptr = std::malloc(gray_size);
-            gray_prev_ptr = std::malloc(gray_size);
-            depth_prev_ptr = std::malloc(depth_size);
-            res_ptr = std::malloc(res_size);
-            weights_ptr = std::malloc(res_size);
-            T_ptr = std::malloc(16*sizeof(float));
-            J_ptr = std:::malloc(6*res_size);
-        #endif
+        // CUDA Unified Memory Allocation
+        int U8C1_size = width*height*sizeof(char), U16C1_size = width*height*sizeof(short);
+        int F32C1_size = width*height*sizeof(float);
+
+        HANDLE_CUDA_ERROR(cudaSetDeviceFlags(cudaDeviceMapHost));
+        HANDLE_CUDA_ERROR(cudaMemcpyToSymbol(CM, cam_mat.data(), 9*sizeof(float)));
+        HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &gray_ptr, U8C1_size));
+        HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &gray_prev_ptr, U8C1_size));
+        HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &depth_prev_ptr, U16C1_size));
+        HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &res_ptr, F32C1_size));
+        HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &weights_ptr, F32C1_size));            
+        HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &T_ptr, 16*sizeof(float)));
+        HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &J_ptr, 6*F32C1_size));
+        std::cout << "CUDA Unified memory allocated" << std::endl;
 
         // Images
         gray = cv::Mat(height, width, CV_8UC1, gray_ptr);
@@ -63,26 +54,18 @@ namespace otto{
     GPUDenseVisualOdometry::~GPUDenseVisualOdometry()
     {
         std::cout << "Exited dtor" << std::endl;
-        #if (DVO_USE_CUDA > 0)
-            HANDLE_CUDA_ERROR(cudaFree(gray_ptr));
-            HANDLE_CUDA_ERROR(cudaFree(gray_prev_ptr));
-            HANDLE_CUDA_ERROR(cudaFree(depth_prev_ptr));
-            HANDLE_CUDA_ERROR(cudaFree(res_ptr));
-            HANDLE_CUDA_ERROR(cudaFree(weights_ptr));
-            HANDLE_CUDA_ERROR(cudaFree(T_ptr));
-            HANDLE_CUDA_ERROR(cudaFree(J_ptr));
-        #else
-            std::free(gray_ptr);
-            std::free(gray_prev_ptr);
-            std::free(depth_prev_ptr);
-            std::free(res_ptr);
-            std::free(weights_ptr);
-            std::free(T_ptr);
-            std::free(J_ptr);
-        #endif
+
+        HANDLE_CUDA_ERROR(cudaFree(gray_ptr));
+        HANDLE_CUDA_ERROR(cudaFree(gray_prev_ptr));
+        HANDLE_CUDA_ERROR(cudaFree(depth_prev_ptr));
+        HANDLE_CUDA_ERROR(cudaFree(res_ptr));
+        HANDLE_CUDA_ERROR(cudaFree(weights_ptr));
+        HANDLE_CUDA_ERROR(cudaFree(T_ptr));
+        HANDLE_CUDA_ERROR(cudaFree(J_ptr));
+
     }
 
-    cv::Mat GPUDenseVisualOdometry::step(cv::Mat& color, cv::Mat& depth_in)
+    Mat4f GPUDenseVisualOdometry::step(cv::Mat& color, cv::Mat& depth_in)
     {
         assert(("Image should have the same resolution!", color.cols == depth_in.cols && color.rows == depth_in.rows));
 
@@ -91,14 +74,16 @@ namespace otto{
         cv::cvtColor(color, gray, cv::COLOR_BGR2GRAY);
         cv::Mat depth(height_, width_, CV_16UC1);
         depth_in.convertTo(depth, CV_16UC1);
+        Mat4f T;
 
         // Check if it is 1st frame
         if(!first_frame)
         {
-            do_gauss_newton();
+            T = do_gauss_newton();
         }
         else
-        {
+        {   
+            T = Mat4f::Identity();
             first_frame = false;
         }
 
@@ -108,9 +93,7 @@ namespace otto{
 
         #if (DVO_DEBUG > 0)
             // Display images
-            // std::cout << "Gray step: " << gray.step << "| gray_prev step: " << gray_prev.step << "| depth step: " << depth.step << std::endl;
             cv::imshow("Gray", gray);
-
             cv::imshow("Gray prev", gray_prev);
             
             double min, max;
@@ -131,64 +114,53 @@ namespace otto{
             cv::imshow("Weights", weights_scaled);
         #endif
 
-        return residuals;
+        return T;
     }
 
     void GPUDenseVisualOdometry::weighting()
     {
-        // Check for CUDA
-        #if(DVO_USE_CUDA > 0)
-            float *var;
-            HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &var, sizeof(float)));
-            *var = SIGMA_INITIAL*SIGMA_INITIAL;
-            call_weighting_kernel(res_ptr,
-                                  weights_ptr,
-                                  var,
-                                  DOF_DEFAULT,
-                                  width_,
-                                  height_);
-            HANDLE_CUDA_ERROR(cudaFree(var));
-        #endif
+        float *var;
+        HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &var, sizeof(float)));
+        *var = SIGMA_INITIAL*SIGMA_INITIAL;
+
+        call_weighting_kernel(  res_ptr,
+                                weights_ptr,
+                                var,
+                                DOF_DEFAULT,
+                                width_,
+                                height_);
+
+        HANDLE_CUDA_ERROR(cudaFree(var));
     }
 
     void GPUDenseVisualOdometry::compute_residuals()
-    {
-        // Check for CUDA
-        #if(DVO_USE_CUDA > 0)              
-            call_residuals_kernel(  gray_ptr,
-                                    gray_prev_ptr,
-                                    depth_prev_ptr,
-                                    res_ptr,
-                                    T_ptr,
-                                    scale,
-                                    width_,
-                                    height_);
-                                
-        #endif
+    {           
+        call_residuals_kernel(  gray_ptr,
+                                gray_prev_ptr,
+                                depth_prev_ptr,
+                                res_ptr,
+                                T_ptr,
+                                scale,
+                                width_,
+                                height_);
     }
 
     void GPUDenseVisualOdometry::compute_jacobian()
     {
-        #if DVO_USE_CUDA
-            call_jacobian_kernel(gray_ptr,
-                                 depth_prev_ptr,
-                                 J_ptr, 
-                                 T_ptr,
-                                 scale,
-                                 width_,
-                                 height_);
-            // std::cout << "J: (" << J.minCoeff() << ", " << J.maxCoeff() << ")" << std::endl;
-        #endif
+        call_jacobian_kernel(   gray_ptr,
+                                depth_prev_ptr,
+                                J_ptr, 
+                                T_ptr,
+                                scale,
+                                width_,
+                                height_);
     }
 
-    void GPUDenseVisualOdometry::do_gauss_newton()
+    Mat4f GPUDenseVisualOdometry::do_gauss_newton()
     {
         // Initial pose estimation
-        // Eigen::Map<Eigen::Matrix<float, 4, 4, Eigen::RowMajor>> T(T_ptr);
-
-        Mat4f T;
-        T = Eigen::Map<Mat4f>(T_ptr);
-        T.setIdentity();
+        Eigen::Map<Mat4f> T(T_ptr);
+        T = Mat4f::Identity();
 
         float error_prev = std::numeric_limits<float>::max();
 
@@ -196,36 +168,53 @@ namespace otto{
         {
             // Compute residuals
             compute_residuals();
-            Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, 1>> R(res_ptr, width_*height_, 1);
+            Eigen::Map<Eigen::VectorXf> R(res_ptr, width_*height_);
 
             // Calculate robust weights estmations
             weighting();
-            Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, 1>> W(weights_ptr, width_*height_, 1);
+            Eigen::Map<Eigen::VectorXf> W(weights_ptr, width_*height_);
 
             // Compute Jacobian
             compute_jacobian();
             Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, 6, Eigen::RowMajor>> J(J_ptr, width_*height_, 6);
 
             // Weight Jacobian and residuals
+            Eigen::Matrix<float, 6, Eigen::Dynamic, Eigen::RowMajor> Jt = J.transpose();
             J = J.array().colwise() * W.array();
             R.cwiseProduct(W);
-
-            Eigen::Matrix<float, 6, Eigen::Dynamic, Eigen::RowMajor> Jt = J.transpose();
 
             float error = R.transpose()*R;
 
             // Optimize Gauss-Newton with Cholesky decomposition
-            Eigen::VectorXf b = Jt*R;
+            Eigen::VectorXf b = -Jt*R;
             Eigen::MatrixXf H = Jt*J;
-            Vec6f delta_xi = -(H.ldlt().solve(b));
+            Vec6f delta_xi = H.ldlt().solve(b);
 
             // Update Pose estimation
             T = T*SE3_exp(delta_xi);
 
-            std::cout << "[" << i+1 << "/100] Error: " << error << std::endl;
+            // std::cout << "[" << i+1 << "/100] Error: " << error << "Residuals: (" \
+            //           << R.minCoeff() << ", " << R.maxCoeff() << ")" << std::endl;
+            // std::cout << "delta: " << delta_xi << std::endl;                      
+
+            // Evaluate convergence
             if(error/error_prev > 0.995)
                 break;
+
+            error_prev = error;
         }
         
+        return T;
     }
+
+    Mat3f GPUDenseVisualOdometry::get_camera_matrix()
+    {
+        return cam_mat;
+    }
+    
+    float GPUDenseVisualOdometry::get_scale()
+    {
+        return scale;
+    }
+
 } // namepsace otto

@@ -15,12 +15,13 @@
 // OpenCV
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
+#include <opencv2/core/eigen.hpp>
 #ifdef DVO_DEBUG
     #include <opencv2/highgui.hpp>
 #endif
 
 // DVO files
-#ifdef DVO_USE_CUDA
+#if (DVO_USE_CUDA > 0)
     #include <DenseVisualOdometryKernel.cuh>
 #endif
 #include <types.h>
@@ -35,9 +36,18 @@ namespace otto
             GPUDenseVisualOdometry(const int width, const int height);
             ~GPUDenseVisualOdometry();
 
-            cv::Mat step(cv::Mat& color, cv::Mat& depth);
+            Mat4f step(cv::Mat& color, cv::Mat& depth);
+            
+            Mat3f get_camera_matrix();
+            float get_scale();
 
         private:
+
+            void compute_residuals();
+            void weighting();
+            void compute_jacobian();
+            Mat4f do_gauss_newton();
+
             int width_, height_;
 
             /* ATTRIBUTES */
@@ -48,11 +58,11 @@ namespace otto
             unsigned char *gray_ptr, *gray_prev_ptr;
             unsigned short* depth_prev_ptr; 
             float* res_ptr, *weights_ptr;
-            
-            // Camera
-            Eigen::Matrix<float, 3, 3, Eigen::RowMajor> cam_mat;
-            float scale;
 
+            // Camera
+            Mat3f cam_mat;
+            float scale;
+            
             // Camera Pose buffer
             float* T_ptr;
 
@@ -64,12 +74,6 @@ namespace otto
             static constexpr float DOF_DEFAULT = 5.0f;
 
             static constexpr int GN_MAX_ITER = 100;
-
-            /* FUNCTIONS */
-            void compute_residuals();
-            void weighting();
-            void compute_jacobian();
-            void do_gauss_newton();
             
     }; // class GPUDense Visual Odometry
 } // namespace otto

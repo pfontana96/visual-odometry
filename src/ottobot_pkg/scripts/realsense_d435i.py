@@ -71,7 +71,22 @@ class RealsenseD435i(object):
                 self.align = rs.align(rs.stream.color)
 
             # Start image streams
-            self.profile = self.pipeline.start(config)
+            stream_up = False
+            attemps = 0
+            for i in range(0,5):
+                try:
+                    self.profile = self.pipeline.start(config)
+                    stream_up = True
+                except Exception as e:
+                    logging.error(e)
+                    logging.info("Trying to start pipeline again.. ({}/5)".format(i+1))
+                    time.sleep(3)
+                if stream_up:
+                    break
+
+            if not stream_up:
+                raise RuntimeError("Couldn't start pipeline")
+
             logging.info("Started pipe, wait for first frames..")
             
             # Eat some frames to allow auto-exposure to settle
