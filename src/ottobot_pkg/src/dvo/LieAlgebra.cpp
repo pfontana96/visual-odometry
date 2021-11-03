@@ -1,4 +1,7 @@
 #include <LieAlgebra.h>
+/*
+Further info available on: https://ethaneade.com/lie.pdf
+*/
 
 namespace otto {
     float limit_angle(float theta)
@@ -38,11 +41,11 @@ namespace otto {
         theta = limit_angle(theta);
 
         Mat3f a_hat =  SO3_hat(a);
-        Mat3f R = cos(theta)*Mat3f::Identity() + (1 - cos(theta))*(a*a.transpose()) + (1 + sin(theta))*a_hat;
+        Mat3f R = Mat3f::Identity() + (sin(theta)/theta)*a_hat + ((1 - cos(theta))/(theta*theta))*a_hat*a_hat;
         return R;
     }
 
-    // // SE(3)
+    // SE(3)
     Mat4f SE3_hat(const Eigen::Ref<const Vec6f>& xi)
     {
         Mat4f T = Mat4f::Zero();
@@ -55,7 +58,6 @@ namespace otto {
     Mat4f SE3_exp(const Eigen::Ref<const Vec6f>& xi)
     {
         Mat4f T = Mat4f::Identity();
-        Mat4f xi_hat = SE3_hat(xi);
         float theta = xi.tail<3>().squaredNorm();
 
         // Check for singularity at 0
@@ -63,8 +65,18 @@ namespace otto {
         {
             T.topRightCorner<3,1>() = xi.head<3>();
         }else{
-            Mat4f xi_hat_2 = xi_hat*xi_hat;
-            T += xi_hat + ((1 - cos(theta))/(pow(theta, 2)))*xi_hat_2 + ((theta - sin(theta))/(pow(theta, 3)))*(xi_hat_2*xi_hat);
+            float A, B, C;
+            A = sin(theta)/theta;
+            B = (1 - cos(theta))/(theta*theta);
+            C = (1 - A)/(theta*theta);
+
+            Mat3f phi_hat = SO3_hat(xi.tail<3>());
+            Mat3f phi_hat_2 = phi_hat*phi_hat;
+            Mat3f R = Mat3f::Identity() + A*phi_hat + B*phi_hat_2;
+            Mat3f V = Mat3f::Identity() + A*phi_hat + C*phi_hat_2;
+            
+            T.topLeftCorner<3,3>() = R;
+            T.topRightCorner<3,1>() = V*xi.head<3>(); 
         }
 
         return T;

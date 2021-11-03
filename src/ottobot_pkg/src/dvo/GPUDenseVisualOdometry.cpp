@@ -1,5 +1,11 @@
 #include <GPUDenseVisualOdometry.h>
 
+#include <chrono>
+#include <iomanip>
+using Time = std::chrono::high_resolution_clock;
+using double_sec = std::chrono::duration<double>;
+using time_point = std::chrono::time_point<Time, double_sec>;
+
 namespace otto{
     GPUDenseVisualOdometry::GPUDenseVisualOdometry(const int width, const int height)
     {
@@ -158,43 +164,73 @@ namespace otto{
 
     Mat4f GPUDenseVisualOdometry::do_gauss_newton()
     {
+
         // Initial pose estimation
         Eigen::Map<Mat4f> T(T_ptr);
         T = Mat4f::Identity();
 
         float error_prev = std::numeric_limits<float>::max();
 
+        float *H_ptr, *b_ptr;
+        HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &H_ptr, sizeof(float)*6*6));
+        HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &b_ptr, sizeof(float)*6));
+
         for(int i = 0; i < GN_MAX_ITER; i++)
         {
-            // Compute residuals
+            // time_point start = Time::now();
+
+            // // Compute residuals
+            // compute_residuals();
+            // Eigen::Map<Eigen::VectorXf> R(res_ptr, width_*height_);
+
+            // // Calculate robust weights estmations
+            // weighting();
+            // Eigen::Map<Eigen::VectorXf> W(weights_ptr, width_*height_);
+
+            // // Compute Jacobian
+            // compute_jacobian();
+            // Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, 6, Eigen::RowMajor>> J(J_ptr, width_*height_, 6);
+            // time_point end_gpu = Time::now();
+
+            // // Weight Jacobian and residuals
+            // Eigen::Matrix<float, 6, Eigen::Dynamic, Eigen::RowMajor> Jt = J.transpose();
+            // J = J.array().colwise() * W.array();
+            // R.cwiseProduct(W);
+
+            // float error = R.transpose()*R;
+
+            // // Optimize Gauss-Newton with Cholesky decomposition
+            // Eigen::VectorXf b = -Jt*R;
+
+            // time_point H_start = Time::now();
+            // Eigen::MatrixXf H = Jt*J;
+
+            time_point start = Time::now();
             compute_residuals();
-            Eigen::Map<Eigen::VectorXf> R(res_ptr, width_*height_);
-
-            // Calculate robust weights estmations
+            
             weighting();
-            Eigen::Map<Eigen::VectorXf> W(weights_ptr, width_*height_);
 
-            // Compute Jacobian
             compute_jacobian();
-            Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, 6, Eigen::RowMajor>> J(J_ptr, width_*height_, 6);
 
-            // Weight Jacobian and residuals
-            Eigen::Matrix<float, 6, Eigen::Dynamic, Eigen::RowMajor> Jt = J.transpose();
-            J = J.array().colwise() * W.array();
-            R.cwiseProduct(W);
+            float error;
+            error = call_newton_gauss_kernel(res_ptr, weights_ptr, J_ptr, H_ptr, b_ptr, width_*height_);
 
-            float error = R.transpose()*R;
+            time_point end_gpu = Time::now();
 
-            // Optimize Gauss-Newton with Cholesky decomposition
-            Eigen::VectorXf b = -Jt*R;
-            Eigen::MatrixXf H = Jt*J;
+            Eigen::Map<Eigen::Matrix<float, 6, 6, Eigen::RowMajor>> H(H_ptr, 6, 6);
+            Eigen::Map<Vec6f> b(b_ptr, 6, 1);
+
             Vec6f delta_xi = H.ldlt().solve(b);
 
             // Update Pose estimation
             T = T*SE3_exp(delta_xi);
 
-            // std::cout << "[" << i+1 << "/100] Error: " << error << "Residuals: (" \
-            //           << R.minCoeff() << ", " << R.maxCoeff() << ")" << std::endl;
+            time_point end = Time::now();
+
+            // std::cout << "Elapsed time: " << std::fixed << std::setprecision(4) 
+            //           << (end - start).count() << "(gpu: " << (end_gpu - start).count() 
+            //           << ")" << std::endl;
+
             // std::cout << "delta: " << delta_xi << std::endl;                      
 
             // Evaluate convergence
@@ -203,7 +239,10 @@ namespace otto{
 
             error_prev = error;
         }
-        
+
+        HANDLE_CUDA_ERROR(cudaFree(H_ptr));
+        HANDLE_CUDA_ERROR(cudaFree(b_ptr));
+
         return T;
     }
 

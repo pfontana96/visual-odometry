@@ -62,6 +62,17 @@ void call_jacobian_kernel(  const unsigned char* gray,
                             int width,
                             int height);
 
+void call_create_H_matrix_kernel(   const float* J,
+                                    float* H,
+                                    int size);
+
+float call_newton_gauss_kernel( const float* residuals,
+                                const float* weights,
+                                const float* J,
+                                float* H,
+                                float* b,
+                                int size);
+
 /*------------------------------------   KERNELS   -----------------------------------*/
 
 __global__ void residuals_kernel( const unsigned char* gray,
@@ -102,6 +113,18 @@ __global__ void gradients_kernel(const unsigned char* gray,
                                  float* grady,
                                  int width,
                                  int height);
+
+__global__ void create_H_matrix_kernel(const float* J,
+                                       float* H,
+                                       int size);
+
+__global__ void newton_gauss_kernel(const float* residuals,
+                                    const float* weights,
+                                    const float* J,
+                                    float* H,
+                                    float* b,
+                                    float* error,
+                                    int size);                                 
 
 /*------------------------------------  FUNCTIONS  -----------------------------------*/
 

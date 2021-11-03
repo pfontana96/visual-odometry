@@ -24,7 +24,8 @@ namespace otto {
     DVOROSNode::DVOROSNode(ros::NodeHandle& nh):
         sync(SyncPolicy(10), color_sub, depth_sub),
         dvo(424, 240),
-        tf_listener(tf_buffer)
+        tf_listener(tf_buffer),
+        rate(15)
     {
         nh_ = nh;
 
@@ -38,11 +39,24 @@ namespace otto {
         pointcloud = nh_.param<bool>("pointcloud", false);
 
         if(pointcloud)
+        {
             ROS_INFO("PointCloud creation enabled");
 
-        pub_cloud = nh_.advertise<RGBPointCloud>(ros::this_node::getNamespace()    \
-                                                 + "/" + ros::this_node::getName() \
-                                                 + "/cloud", 5);
+            cloud.reset(new RGBPointCloud);
+            cloud->header.frame_id = "/camera_link";
+            cloud->is_dense = false;
+            cloud->height = 240;
+            cloud->width = 424;
+            cloud->points.resize(cloud->height*cloud->width);
+
+            pub_cloud = nh_.advertise<RGBPointCloud>(   ros::this_node::getNamespace()      \
+                                                        + "/" + ros::this_node::getName()   \
+                                                        + "/cloud", 5);
+        }
+
+        // At start we assume robot's at map's origin
+        accumulated_transform.setIdentity();
+        stamp = ros::Time::now();
     }
 
     DVOROSNode::~DVOROSNode()
@@ -89,45 +103,43 @@ namespace otto {
         tf2::Vector3 t_tf(T_dvo(0,3), T_dvo(1,3), T_dvo(2,3));
         tf2::Transform T, T_dvo_tf(R_tf, t_tf);
         
-        // Compute map->base_link transform
-        T = T_dvo_tf*base2cam;
+        // Update robot's pose
+        accumulated_transform *= T_dvo_tf*base2cam;
+        // Renormalized rotation (usually required after multiplying multiple transforms)
+        accumulated_transform.setRotation(accumulated_transform.getRotation().normalize());
+
+        stamp = color->header.stamp;
+
+        // // Compute map->base_link transform
+        // T = T_dvo_tf*base2cam;
         
-        tf2::Quaternion q = T.getRotation();
-        t_tf = T.getOrigin();
+        // tf2::Quaternion q = T.getRotation();
+        // t_tf = T.getOrigin();
 
-        // Broadcast robot's pose
-        geometry_msgs::TransformStamped tf_msg_out;
-        tf_msg_out.header.stamp = color->header.stamp;
-        tf_msg_out.header.frame_id = "map";
-        tf_msg_out.child_frame_id = "base_link";
-        tf_msg_out.transform.translation.x = t_tf.x();
-        tf_msg_out.transform.translation.y = t_tf.y();
-        tf_msg_out.transform.translation.z = t_tf.z();
-        tf_msg_out.transform.rotation.x = q.x();
-        tf_msg_out.transform.rotation.y = q.y();
-        tf_msg_out.transform.rotation.z = q.z();
-        tf_msg_out.transform.rotation.w = q.w();
+        // // Broadcast robot's pose
+        // geometry_msgs::TransformStamped tf_msg_out;
+        // tf_msg_out.header.stamp = color->header.stamp;
+        // tf_msg_out.header.frame_id = "map";
+        // tf_msg_out.child_frame_id = "base_link";
+        // tf_msg_out.transform.translation.x = t_tf.x();
+        // tf_msg_out.transform.translation.y = t_tf.y();
+        // tf_msg_out.transform.translation.z = t_tf.z();
+        // tf_msg_out.transform.rotation.x = q.x();
+        // tf_msg_out.transform.rotation.y = q.y();
+        // tf_msg_out.transform.rotation.z = q.z();
+        // tf_msg_out.transform.rotation.w = q.w();
 
-        br.sendTransform(tf_msg_out);
+        // br.sendTransform(tf_msg_out);
 
-        // Publish pointcloud if required
+        // Update pointcloud if required
         if(pointcloud)
-        {
-            RGBPointCloud::Ptr cloud = RGBPointCloud::Ptr(new RGBPointCloud);
-            create_pointcloud(color_ptr->image, depth_ptr->image, cloud);
-            publish_pointcloud(cloud);
-        }
+            create_pointcloud(color_ptr->image, depth_ptr->image);
+        
     }
 
     void DVOROSNode::create_pointcloud( const cv::Mat& color, 
-                                        const cv::Mat& depth, 
-                                        RGBPointCloud::Ptr& cloud)
+                                        const cv::Mat& depth)
     {
-        cloud->header.frame_id = "/camera_link";
-        cloud->is_dense = false;
-        cloud->height = depth.rows;
-        cloud->width = depth.cols;
-        cloud->points.resize(cloud->height*cloud->width);
 
         Mat3f K = dvo.get_camera_matrix();
         float scale = dvo.get_scale();
@@ -137,15 +149,21 @@ namespace otto {
 
         const float bad_point = std::numeric_limits<float>::quiet_NaN();
 
-        #pragma omp parallel for num_threads(std::thread::hardware_concurrency())
+        #pragma omp parallel for schedule(dynamic) num_threads(std::thread::hardware_concurrency())
         for(int y = 0; y < depth.rows; y++)
         {
-            const cv::Vec3b* rgb_ptr = color.ptr<cv::Vec3b>(y);
-            const ushort* depth_ptr = depth.ptr<ushort>(y);
+            const cv::Vec3b* rgb_ptr;
+            const ushort* depth_ptr;
+
+            #pragma omp critical
+            {
+                rgb_ptr = color.ptr<cv::Vec3b>(y);
+                depth_ptr = depth.ptr<ushort>(y);
+            }
 
             for(int x = 0; x < depth.cols; x++)
             {
-                pcl::PointXYZRGB& p = cloud->points[idx];
+                pcl::PointXYZRGB p;                
                 float z = ((float) depth_ptr[x]) * scale;
 
                 if ( z > 0.0f)
@@ -164,15 +182,54 @@ namespace otto {
                 {
                     p.x = p.y = p.z = p.rgb = bad_point;
                 }
+
+                #pragma omp critical
+                cloud->points[idx] = p;
+
                 idx++;
             }
         }
     }
 
-    void DVOROSNode::publish_pointcloud(RGBPointCloud::Ptr& cloud)
+    void DVOROSNode::publish_all()
     {
-        if(pub_cloud.getNumSubscribers() > 0)
+        // Publish pointcloud if required
+        if(pointcloud && (pub_cloud.getNumSubscribers() > 0))
             pub_cloud.publish(*cloud);
+
+        // Broadcast robot's pose
+        tf2::Quaternion q = accumulated_transform.getRotation();
+        tf2::Vector3 t_tf = accumulated_transform.getOrigin();
+
+        geometry_msgs::TransformStamped tf_msg_out;
+        tf_msg_out.header.stamp = stamp;
+        tf_msg_out.header.frame_id = "map";
+        tf_msg_out.child_frame_id = "base_link";
+        tf_msg_out.transform.translation.x = t_tf.x();
+        tf_msg_out.transform.translation.y = t_tf.y();
+        tf_msg_out.transform.translation.z = t_tf.z();
+        tf_msg_out.transform.rotation.x = q.x();
+        tf_msg_out.transform.rotation.y = q.y();
+        tf_msg_out.transform.rotation.z = q.z();
+        tf_msg_out.transform.rotation.w = q.w();
+
+        br.sendTransform(tf_msg_out);
+    }
+
+    void DVOROSNode::run()
+    {
+        while(ros::ok())
+        {
+            try{
+                ros::spinOnce();
+                publish_all();
+                rate.sleep();
+            }
+            catch(std::runtime_error& e)
+            {
+                ROS_ERROR("%s", e.what());
+            }
+        }
     }
 
 } // namespace otto
@@ -186,7 +243,8 @@ int main(int argc, char** argv)
 
     otto::DVOROSNode node(nh);
 
-    ros::spin();
+    // ros::spin();
+    node.run();
 
     return 0;
 

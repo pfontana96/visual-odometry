@@ -46,6 +46,7 @@ namespace otto{
 
         public:
 
+            void run();
             void callback(  const sensor_msgs::ImageConstPtr& color, 
                             const sensor_msgs::ImageConstPtr& depth);
 
@@ -55,12 +56,12 @@ namespace otto{
         private:
 
             void create_pointcloud( const cv::Mat& color, 
-                                    const cv::Mat& depth, 
-                                    RGBPointCloud::Ptr& cloud);
+                                    const cv::Mat& depth);
 
-            void publish_pointcloud(RGBPointCloud::Ptr& cloud);
+            void publish_all();
 
             ros::NodeHandle nh_;
+            ros::Rate rate;
 
             bool pointcloud;
 
@@ -73,7 +74,12 @@ namespace otto{
             tf2_ros::Buffer tf_buffer;
             tf2_ros::TransformListener tf_listener;
 
+            tf2::Transform accumulated_transform;
+            ros::Time stamp;
+
             ros::Publisher pub_cloud;
+
+            RGBPointCloud::Ptr cloud;
 
     }; // class DVONode
 } // namespace otto

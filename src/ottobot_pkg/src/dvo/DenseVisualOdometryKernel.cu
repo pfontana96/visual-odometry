@@ -124,7 +124,54 @@ void call_jacobian_kernel(  const unsigned char* gray,
     HANDLE_CUDA_ERROR(cudaFree(gradx));
     HANDLE_CUDA_ERROR(cudaFree(grady));
 
-}                            
+}
+
+void call_create_H_matrix_kernel(   const float* J,
+                                    float* H,
+                                    int size)
+{
+    dim3 block(CUDA_BLOCKSIZE, 1), grid;
+    grid.x = (size + block.x - 1)/block.x;
+    grid.y = 1;
+
+    create_H_matrix_kernel<<<grid, block>>> (J, H, size);
+
+    // Check for CUDA errors after launching the kernel
+    HANDLE_CUDA_ERROR(cudaGetLastError());
+    HANDLE_CUDA_ERROR(cudaDeviceSynchronize());
+}                                    
+
+float call_newton_gauss_kernel( const float* residuals,
+                                const float* weights,
+                                const float* J,
+                                float* H,
+                                float* b,
+                                int size)
+{
+    float* error_ptr;
+    HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &error_ptr, sizeof(float)));
+
+    dim3 block(CUDA_BLOCKSIZE, 1), grid;
+    grid.x = (size + block.x - 1)/block.x;
+    grid.y = 1;
+
+    newton_gauss_kernel<<<grid, block>>>(residuals,
+                                         weights,
+                                         J,
+                                         H,
+                                         b,
+                                         error_ptr,
+                                         size);
+
+    // Check for CUDA errors after launching the kernel
+    HANDLE_CUDA_ERROR(cudaGetLastError());
+    HANDLE_CUDA_ERROR(cudaDeviceSynchronize());
+
+    float error = *error_ptr;
+    HANDLE_CUDA_ERROR(cudaFree(error_ptr));
+
+    return error;
+}                                
 
 /*------------------------------------   KERNELS   -----------------------------------*/
 
@@ -293,7 +340,84 @@ __global__ void gradients_kernel(const unsigned char* gray,
 
     // Compute gradient on Y direction
     grady[pixel] = 0.5f*(gray[((tidy+1)*width) + tidx] - gray[((tidy-1)*width) + tidx]);
-}                                 
+}           
+
+// __global__ void create_H_matrix_kernel(const float* J,
+//                                        float* H,
+//                                        int size)
+// {
+//     const int tidx = threadIdx.x + (blockIdx.x * blockDim.x);
+//     const int tidy = threadIdx.y + (blockIdx.y * blockDim.y);
+    
+//     // Check bounds
+//     if(tidx>=6 || tidy>=6)
+//         return;
+
+//     float result = 0.0f;
+//     for(int i = 0; i < size; i++)
+//     {
+//         result += J[i*6 + tidy] * J[i*6 + tidx];
+//     }
+
+//     H[tidy*6 + tidx] = result;
+// }
+
+__global__ void create_H_matrix_kernel(const float* J,
+                                       float* H,
+                                       int size)
+{
+    const int tid = threadIdx.x + (blockIdx.x * blockDim.x);
+
+    // Check Bounds
+    if(tid >= size)
+        return;
+
+    float H_i;
+    for(int i = 0; i < 6; i++)
+    {
+        for(int j = 0; j < 6; j++)
+        {
+            H_i = J[tid*6+i]*J[tid*6+j];
+            atomicAdd(&H[i*6+j], H_i);
+        }
+    }
+}
+
+/*
+Prepares matrix H (6x6) and vector b (6x1) for solving system:
+    Jt*W*J*delta_xi = -Jt*W*residuals
+where H = Jt*W*J and b=-Jt*Jt*residuals
+*/
+__global__ void newton_gauss_kernel(const float* residuals,
+                                    const float* weights,
+                                    const float* J,
+                                    float* H,
+                                    float* b,
+                                    float* error,
+                                    int size)
+{
+    const int tid = threadIdx.x + (blockIdx.x * blockDim.x);
+
+    // Check Bounds
+    if(tid >= size)
+        return;
+
+    float H_i, b_i, error_i;
+    for(int i = 0; i < 6; i++)
+    {
+        b_i = -J[tid*6+i]*weights[tid]*residuals[tid];
+        atomicAdd(&b[i], b_i);
+
+        for(int j = 0; j < 6; j++)
+        {
+            H_i = J[tid*6+i]*weights[tid]*J[tid*6+j];
+            atomicAdd(&H[i*6+j], H_i);
+        }
+    }
+
+    error_i = weights[tid]*residuals[tid]*residuals[tid];
+    atomicAdd(error, error_i);
+}                                    
 
 /*------------------------------------  FUNCTIONS  -----------------------------------*/
 
