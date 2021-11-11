@@ -301,8 +301,14 @@ __global__ void jacobian_kernel( const unsigned char* gray,
     float J_row[6] = {0, 0, 0, 0, 0, 0}, J_i;
     if(!( isnan(x_warped) || isnan(y_warped) ))
     {
-        float Jw[2][6] = {fx/z_new, 0, -fx*x_new/(z_new*z_new), -fx*(x_new*y_new)/(z_new*z_new), fx*(1 + (x_new*x_new)/(z_new*z_new)), -fx*y_new/z_new,
-                          0, fy/z_new, -fy*y_new/(z_new*z_new), -fy*(1 + (y_new*y_new)/(z_new*z_new)), fy*(x_new*y_new)/(z_new*z_new), fy*x_new/z_new};
+        // float Jw[2][6] = {fx/z_new, 0, -fx*x_new/(z_new*z_new), -fx*(x_new*y_new)/(z_new*z_new), fx*(1 + (x_new*x_new)/(z_new*z_new)), -fx*y_new/z_new,
+        //                   0, fy/z_new, -fy*y_new/(z_new*z_new), -fy*(1 + (y_new*y_new)/(z_new*z_new)), fy*(x_new*y_new)/(z_new*z_new), fy*x_new/z_new};
+        
+        // Image Jacobian: 
+        //      https://robotacademy.net.au/lesson/the-image-jacobian/
+        //      https://journals.sagepub.com/doi/10.5772/51833?icid=int.sj-full.text.citing-articles.2&
+        float Jw[2][6] = {-fx/z_new, 0, x_warped/z_new, x_warped*y_warped/fy, -(fx + x_warped*x_warped/fx), y_warped,
+                          0, -fy/z_new, y_warped/z_new, (fy + y_warped*y_warped/fy), -x_warped*y_warped/fx, -x_warped};
         float J1[2];
         J1[0] = bilinear_interpolation(x_warped, y_warped, gradx, width, height);
         J1[1] = bilinear_interpolation(x_warped, y_warped, grady, width, height);

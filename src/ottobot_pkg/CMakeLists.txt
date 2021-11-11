@@ -16,6 +16,7 @@ find_package(catkin REQUIRED COMPONENTS
   message_filters
   tf2
   tf2_ros
+  tf2_eigen
   pcl_ros
 )
 
@@ -95,6 +96,14 @@ if(CMAKE_CUDA_COMPILER)
   set_target_properties(dvo PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 endif(CMAKE_CUDA_COMPILER)
 target_link_libraries(dvo ${OpenCV_LIBRARIES})
+
+if(CATKIN_ENABLE_TESTING)
+  message(STATUS "dvo tests enabled")
+  catkin_add_gtest(test_dvo test/dvo_tests.cpp)
+  # target_include_directories(test_dvo PRIVATE 
+  #   ${DVO_INCLUDE_DIRS})
+  target_link_libraries(test_dvo dvo)
+endif()
 
 ## Nodes
 

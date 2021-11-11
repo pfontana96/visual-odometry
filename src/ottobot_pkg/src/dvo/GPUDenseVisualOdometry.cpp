@@ -1,10 +1,12 @@
 #include <GPUDenseVisualOdometry.h>
 
-#include <chrono>
-#include <iomanip>
-using Time = std::chrono::high_resolution_clock;
-using double_sec = std::chrono::duration<double>;
-using time_point = std::chrono::time_point<Time, double_sec>;
+#if (DVO_CHRONO > 0)
+    #include <chrono>
+    #include <iomanip>
+    using Time = std::chrono::high_resolution_clock;
+    using double_sec = std::chrono::duration<double>;
+    using time_point = std::chrono::time_point<Time, double_sec>;
+#endif
 
 namespace otto{
     GPUDenseVisualOdometry::GPUDenseVisualOdometry(const int width, const int height)
@@ -44,6 +46,7 @@ namespace otto{
         weights = cv::Mat(height, width, CV_32FC1, weights_ptr);
     
         #if (DVO_DEBUG > 0)
+            cv::startWindowThread();
             cv::namedWindow("Gray", cv::WINDOW_AUTOSIZE);
             cv::moveWindow("Gray", 0, 0);
             cv::namedWindow("Gray prev", cv::WINDOW_AUTOSIZE);
@@ -73,6 +76,9 @@ namespace otto{
 
     Mat4f GPUDenseVisualOdometry::step(cv::Mat& color, cv::Mat& depth_in)
     {
+        #if (DVO_CHRONO > 0)
+            time_point start = Time::now();
+        #endif
         assert(("Image should have the same resolution!", color.cols == depth_in.cols && color.rows == depth_in.rows));
 
         // Convert color image to grayscale and depth image to 16 bits depth
@@ -118,6 +124,11 @@ namespace otto{
             cv::minMaxIdx(weights, &min, &max);
             cv::convertScaleAbs(weights, weights_scaled, 255/max);
             cv::imshow("Weights", weights_scaled);
+        #endif
+
+        #if (DVO_CHRONO > 0)
+            time_point end = Time::now();
+            std::cout << "Elapsed time: " << (end - start).count() << std::endl;
         #endif
 
         return T;
@@ -177,35 +188,6 @@ namespace otto{
 
         for(int i = 0; i < GN_MAX_ITER; i++)
         {
-            // time_point start = Time::now();
-
-            // // Compute residuals
-            // compute_residuals();
-            // Eigen::Map<Eigen::VectorXf> R(res_ptr, width_*height_);
-
-            // // Calculate robust weights estmations
-            // weighting();
-            // Eigen::Map<Eigen::VectorXf> W(weights_ptr, width_*height_);
-
-            // // Compute Jacobian
-            // compute_jacobian();
-            // Eigen::Map<Eigen::Matrix<float, Eigen::Dynamic, 6, Eigen::RowMajor>> J(J_ptr, width_*height_, 6);
-            // time_point end_gpu = Time::now();
-
-            // // Weight Jacobian and residuals
-            // Eigen::Matrix<float, 6, Eigen::Dynamic, Eigen::RowMajor> Jt = J.transpose();
-            // J = J.array().colwise() * W.array();
-            // R.cwiseProduct(W);
-
-            // float error = R.transpose()*R;
-
-            // // Optimize Gauss-Newton with Cholesky decomposition
-            // Eigen::VectorXf b = -Jt*R;
-
-            // time_point H_start = Time::now();
-            // Eigen::MatrixXf H = Jt*J;
-
-            time_point start = Time::now();
             compute_residuals();
             
             weighting();
@@ -223,15 +205,7 @@ namespace otto{
             Vec6f delta_xi = H.ldlt().solve(b);
 
             // Update Pose estimation
-            T = T*SE3_exp(delta_xi);
-
-            time_point end = Time::now();
-
-            // std::cout << "Elapsed time: " << std::fixed << std::setprecision(4) 
-            //           << (end - start).count() << "(gpu: " << (end_gpu - start).count() 
-            //           << ")" << std::endl;
-
-            // std::cout << "delta: " << delta_xi << std::endl;                      
+            T = T*lie::SE3_exp(delta_xi);                  
 
             // Evaluate convergence
             if(error/error_prev > 0.995)

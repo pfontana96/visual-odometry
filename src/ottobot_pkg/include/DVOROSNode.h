@@ -3,6 +3,11 @@
 
 // Ottobot Library
 #include <dvo/GPUDenseVisualOdometry.h>
+#include <dvo/types.h>
+
+// Eigen
+#include <eigen3/Eigen/Core>
+#include <eigen3/Eigen/Geometry>
 
 // ROS libraries
 #include <ros/ros.h>
@@ -20,6 +25,8 @@
 
 #include <tf2_ros/transform_broadcaster.h>
 #include <tf2_ros/transform_listener.h>
+
+#include <tf2_eigen/tf2_eigen.h>
 
 #include <tf2_geometry_msgs/tf2_geometry_msgs.h>
 
@@ -74,7 +81,8 @@ namespace otto{
             tf2_ros::Buffer tf_buffer;
             tf2_ros::TransformListener tf_listener;
 
-            tf2::Transform accumulated_transform;
+            // tf2::Transform accumulated_transform;
+            Eigen::Affine3d accumulated_transform;
             ros::Time stamp;
 
             ros::Publisher pub_cloud;

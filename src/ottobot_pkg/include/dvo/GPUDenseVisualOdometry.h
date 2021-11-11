@@ -1,14 +1,15 @@
 #ifndef DENSE_VISUAL_ODOMETRY_H
 #define DENSE_VISUAL_ODOMETRY_H
 
-#define DVO_USE_CUDA 1
 #define DVO_DEBUG 0
+#define DVO_CHRONO 1
 
 #include <assert.h>
 #include <cmath>
 #include <iostream>
 
 #include <eigen3/Eigen/Core>
+#include <eigen3/Eigen/Cholesky>
 
 #include <manif/manif.h>
 
@@ -16,14 +17,12 @@
 #include <opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
 #include <opencv2/core/eigen.hpp>
-#ifdef DVO_DEBUG
+#if (DVO_DEBUG > 0)
     #include <opencv2/highgui.hpp>
 #endif
 
 // DVO files
-#if (DVO_USE_CUDA > 0)
-    #include <DenseVisualOdometryKernel.cuh>
-#endif
+#include <DenseVisualOdometryKernel.cuh>
 #include <types.h>
 #include <LieAlgebra.h>
 

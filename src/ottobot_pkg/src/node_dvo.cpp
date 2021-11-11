@@ -11,7 +11,6 @@
 
 // Debug libraries
 #include <opencv2/opencv.hpp>
-// #include <opencv2/highgui.hpp>
 #include <stdio.h>
 #include <sys/types.h>
 #include <dirent.h>
@@ -79,16 +78,19 @@ namespace otto {
         }
 
         geometry_msgs::TransformStamped tf_msg;
-        tf2::Stamped<tf2::Transform> cam2base;
-        tf2::Transform base2cam;
+        Eigen::Affine3d base_to_camera;
+        // tf2::Stamped<tf2::Transform> cam2base;
+        // tf2::Transform base2cam;
         try
         {
-            // Get last available transform from base_link to camera_link
+            // Get last available transform from base_link to camera_link (static transform)
             tf_msg = tf_buffer.lookupTransform("camera_link", "base_link", color->header.stamp);
-            tf2::fromMsg(tf_msg, cam2base);
+            // tf2::fromMsg(tf_msg, cam2base);
 
             // What we actually want it's the inverse of this transformation
-            base2cam = cam2base.inverse();
+            // base2cam = cam2base.inverse();
+
+            base_to_camera = tf2::transformToEigen(tf_msg);
         }
         catch(tf2::TransformException& e)
         {
@@ -97,39 +99,13 @@ namespace otto {
         }
 
         Mat4f T_dvo = dvo.step(color_ptr->image, depth_ptr->image);
-        tf2::Matrix3x3 R_tf = tf2::Matrix3x3( T_dvo(0,0), T_dvo(0,1), T_dvo(0,2),
-                                              T_dvo(1,0), T_dvo(1,1), T_dvo(1,2),
-                                              T_dvo(2,0), T_dvo(2,1), T_dvo(2,2));
-        tf2::Vector3 t_tf(T_dvo(0,3), T_dvo(1,3), T_dvo(2,3));
-        tf2::Transform T, T_dvo_tf(R_tf, t_tf);
-        
-        // Update robot's pose
-        accumulated_transform *= T_dvo_tf*base2cam;
-        // Renormalized rotation (usually required after multiplying multiple transforms)
-        accumulated_transform.setRotation(accumulated_transform.getRotation().normalize());
+        Eigen::Affine3d camera_odometry;
+        camera_odometry.matrix() = T_dvo.cast<double>();
+
+        // Update base_link pose
+        accumulated_transform = accumulated_transform*(base_to_camera*camera_odometry);
 
         stamp = color->header.stamp;
-
-        // // Compute map->base_link transform
-        // T = T_dvo_tf*base2cam;
-        
-        // tf2::Quaternion q = T.getRotation();
-        // t_tf = T.getOrigin();
-
-        // // Broadcast robot's pose
-        // geometry_msgs::TransformStamped tf_msg_out;
-        // tf_msg_out.header.stamp = color->header.stamp;
-        // tf_msg_out.header.frame_id = "map";
-        // tf_msg_out.child_frame_id = "base_link";
-        // tf_msg_out.transform.translation.x = t_tf.x();
-        // tf_msg_out.transform.translation.y = t_tf.y();
-        // tf_msg_out.transform.translation.z = t_tf.z();
-        // tf_msg_out.transform.rotation.x = q.x();
-        // tf_msg_out.transform.rotation.y = q.y();
-        // tf_msg_out.transform.rotation.z = q.z();
-        // tf_msg_out.transform.rotation.w = q.w();
-
-        // br.sendTransform(tf_msg_out);
 
         // Update pointcloud if required
         if(pointcloud)
@@ -198,16 +174,17 @@ namespace otto {
             pub_cloud.publish(*cloud);
 
         // Broadcast robot's pose
-        tf2::Quaternion q = accumulated_transform.getRotation();
-        tf2::Vector3 t_tf = accumulated_transform.getOrigin();
+        Eigen::Vector3d t = accumulated_transform.translation();
+        Eigen::Quaterniond q(accumulated_transform.rotation());
+        q.normalize();
 
         geometry_msgs::TransformStamped tf_msg_out;
         tf_msg_out.header.stamp = stamp;
         tf_msg_out.header.frame_id = "map";
         tf_msg_out.child_frame_id = "base_link";
-        tf_msg_out.transform.translation.x = t_tf.x();
-        tf_msg_out.transform.translation.y = t_tf.y();
-        tf_msg_out.transform.translation.z = t_tf.z();
+        tf_msg_out.transform.translation.x = t.x();
+        tf_msg_out.transform.translation.y = t.y();
+        tf_msg_out.transform.translation.z = t.z();
         tf_msg_out.transform.rotation.x = q.x();
         tf_msg_out.transform.rotation.y = q.y();
         tf_msg_out.transform.rotation.z = q.z();
