@@ -1,7 +1,0 @@
-<launch>
-    <node pkg="ottobot_pkg" type="aruco_detector_node.py" name="aruco_tracker" ns="ottobot" output="screen">
-        <param name="img_in" value="/ottobot/realsense_camera/raw/rgb_image"/>
-        <param name="img_out" value="/ottobot/aruco_tracker/image"/>
-        <param name="frame_id" value="/camera_link"/>
-    </node>
-</launch>
