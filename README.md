@@ -1,5 +1,5 @@
 # ottobot
-ROS based autonomous mobile robot
+Autonomous mobile robot project
 
 ## Initial set up
 
