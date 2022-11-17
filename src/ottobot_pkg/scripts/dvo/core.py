@@ -267,10 +267,11 @@ if __name__ == '__main__':
             data = yaml.load(f, Loader=yaml.loader.SafeLoader)
         camera_matrix = np.array(data['camera_matrix'])
         coeffs = np.array(data['coeffs'])
+        scale = data["scale"]
     except Exception as e:
         logging.error(e)
 
-    scale = 0.0010000000474974513
+    # scale = 0.0010000000474974513
 
     dump_path = Path().home().joinpath("Documents/test_data")
 

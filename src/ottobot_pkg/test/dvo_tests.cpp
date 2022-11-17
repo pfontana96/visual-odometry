@@ -1,10 +1,15 @@
 #include <gtest/gtest.h>
 #include <iostream>
+#include <sys/types.h>
+#include <dirent.h>
 
 // dvo
 #include <GPUDenseVisualOdometry.h>
 #include <LieAlgebra.h>
 #include <types.h>
+
+#include <opencv2/highgui.hpp>
+#include <opencv2/core.hpp>
 
 using namespace otto;
 
@@ -72,6 +77,35 @@ TEST(SE3TestSuit, HandlesPreDefinedExamples)
 
   ASSERT_TRUE(lie::SE3_exp(xi).isApprox(T, LIE_EPSILON));
   ASSERT_TRUE(lie::SE3_log(T).isApprox(xi, LIE_EPSILON));
+}
+
+TEST(DVOTests, HandlesResidualsImageComputation)
+{
+  GPUDenseVisualOdometry dvo(__DIRNAME__ + "data/camera_intrinsics.yaml", 424, 240);
+
+  // Count files in dir
+  DIR* dp;
+  struct dirent *ep;
+  std::string imgs_path = __DIRNAME__ + "data/rgb";
+  dp = opendir(imgs_path.c_str());
+
+  int nb_imgs = 0;
+  if(dp != NULL)
+  {
+      while ((ep = readdir(dp)) != NULL)
+      {
+        if(ep->d_type == DT_REG)
+          nb_imgs++;
+      }
+      (void) closedir(dp);
+
+      printf("Found %d images\n", nb_imgs);
+  }
+  else
+      perror("Couldn't open the directory");
+
+  ASSERT_TRUE(true);
+
 }
 
 int main(int argc, char** argv)

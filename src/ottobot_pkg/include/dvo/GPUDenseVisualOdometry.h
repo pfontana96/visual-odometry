@@ -1,12 +1,14 @@
 #ifndef DENSE_VISUAL_ODOMETRY_H
 #define DENSE_VISUAL_ODOMETRY_H
 
-#define DVO_DEBUG 0
+#define DVO_DEBUG 1
 #define DVO_CHRONO 1
 
 #include <assert.h>
 #include <cmath>
 #include <iostream>
+#include <string.h>
+#define __DIRNAME__ (std::string(__FILE__).substr(0, (strrchr(__FILE__, '/') + 1) - __FILE__))
 
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/Cholesky>
@@ -21,6 +23,9 @@
     #include <opencv2/highgui.hpp>
 #endif
 
+// YAML
+#include <yaml-cpp/yaml.h>
+
 // DVO files
 #include <DenseVisualOdometryKernel.cuh>
 #include <types.h>
@@ -32,7 +37,8 @@ namespace otto
     {
         public:
 
-            GPUDenseVisualOdometry(const int width, const int height);
+            GPUDenseVisualOdometry(const std::string config_file, const int width, const int height);
+            // GPUDenseVisualOdometry(std::string config_file);
             ~GPUDenseVisualOdometry();
 
             Mat4f step(cv::Mat& color, cv::Mat& depth);

@@ -126,21 +126,6 @@ void call_jacobian_kernel(  const unsigned char* gray,
 
 }
 
-void call_create_H_matrix_kernel(   const float* J,
-                                    float* H,
-                                    int size)
-{
-    dim3 block(CUDA_BLOCKSIZE, 1), grid;
-    grid.x = (size + block.x - 1)/block.x;
-    grid.y = 1;
-
-    create_H_matrix_kernel<<<grid, block>>> (J, H, size);
-
-    // Check for CUDA errors after launching the kernel
-    HANDLE_CUDA_ERROR(cudaGetLastError());
-    HANDLE_CUDA_ERROR(cudaDeviceSynchronize());
-}                                    
-
 float call_newton_gauss_kernel( const float* residuals,
                                 const float* weights,
                                 const float* J,
@@ -340,60 +325,32 @@ __global__ void gradients_kernel(const unsigned char* gray,
         return;
 
     const int pixel = (tidy*width) + tidx;
+    float gradx_i = 0.0f, grady_i = 0.0f;
 
     // Compute gradient on X direction
-    gradx[pixel] = 0.5f*(gray[(tidy*width) + (tidx+1)] - gray[(tidy*width) + (tidx-1)]);
+    if(tidx>0 && tidx<(width-1))
+        gradx_i = 0.5f*(gray[(tidy*width) + (tidx+1)] - gray[(tidy*width) + (tidx-1)]);
 
     // Compute gradient on Y direction
-    grady[pixel] = 0.5f*(gray[((tidy+1)*width) + tidx] - gray[((tidy-1)*width) + tidx]);
+    if(tidy>0 && tidy<(height-1))
+        grady_i = 0.5f*(gray[((tidy+1)*width) + tidx] - gray[((tidy-1)*width) + tidx]);
+
+    gradx[pixel] = gradx_i;
+    grady[pixel] = grady_i;
 }           
 
-// __global__ void create_H_matrix_kernel(const float* J,
-//                                        float* H,
-//                                        int size)
-// {
-//     const int tidx = threadIdx.x + (blockIdx.x * blockDim.x);
-//     const int tidy = threadIdx.y + (blockIdx.y * blockDim.y);
-    
-//     // Check bounds
-//     if(tidx>=6 || tidy>=6)
-//         return;
-
-//     float result = 0.0f;
-//     for(int i = 0; i < size; i++)
-//     {
-//         result += J[i*6 + tidy] * J[i*6 + tidx];
-//     }
-
-//     H[tidy*6 + tidx] = result;
-// }
-
-__global__ void create_H_matrix_kernel(const float* J,
-                                       float* H,
-                                       int size)
-{
-    const int tid = threadIdx.x + (blockIdx.x * blockDim.x);
-
-    // Check Bounds
-    if(tid >= size)
-        return;
-
-    float H_i;
-    for(int i = 0; i < 6; i++)
-    {
-        for(int j = 0; j < 6; j++)
-        {
-            H_i = J[tid*6+i]*J[tid*6+j];
-            atomicAdd(&H[i*6+j], H_i);
-        }
-    }
-}
-
-/*
-Prepares matrix H (6x6) and vector b (6x1) for solving system:
-    Jt*W*J*delta_xi = -Jt*W*residuals
-where H = Jt*W*J and b=-Jt*Jt*residuals
-*/
+/**
+ * Prepares matrix H (6x6) and vector b (6x1) for solving system:
+ *   Jt*W*J*delta_xi = -Jt*W*residuals 
+ * @param[in] residuals computed residuals (Nx1)
+ * @param[in] weights computed weights for each residual (Nx1)
+ * @param[in] J computed residuals Jacobian with respecto to camera pose (Nx6)
+ * @param[out] H computed (6x6) matrix, H = Jt*W*J where W is an (NxN) matrix with each
+ *               element of weights in its diagonal
+ * @param[out] b computed (6x1) vector, b=-Jt*Jt*residuals
+ * @param[out] error pointer to error value
+ * @param[in] size total number of pixels N
+ */
 __global__ void newton_gauss_kernel(const float* residuals,
                                     const float* weights,
                                     const float* J,
@@ -427,23 +384,21 @@ __global__ void newton_gauss_kernel(const float* residuals,
 
 /*------------------------------------  FUNCTIONS  -----------------------------------*/
 
-/*
- Bilinear interpolation
- Arguments:
- ---------
-     x: array of x-coordinates to interpolate
-     y: array of y-coordinates to interpolate
-     dest: array of interpolation results (same dims as x and y)
-     src_img: Original image
-     width: src_img width
-     height: src_img height
-     N: Nb of points (dim of x, y, and dest)
-*/
-__device__ float bilinear_interpolation(   const float x, 
-                                            const float y, 
-                                            const unsigned char* src_img,
-                                            const int width,
-                                            const int height)
+/**
+ * Interpolates a given (x,y) coordinates within an image
+ *
+ * @param x x-coordinate to interpolate
+ * @param y y-coordinate to interpolate
+ * @param src_img original image
+ * @param width image's width
+ * @param height image's height
+ * @returns interpolated value
+ */
+__device__ float bilinear_interpolation( const float x, 
+                                         const float y, 
+                                         const unsigned char* src_img,
+                                         const int width,
+                                         const int height)
 {
     int x0 = (int) floorf(x), y0 = (int) floorf(y);
     int x1 = x0 + 1, y1 = y0 + 1;   
@@ -470,6 +425,16 @@ __device__ float bilinear_interpolation(   const float x,
     return result;
 }     
 
+/**
+ * Interpolates a given (x,y) coordinates within an image
+ *
+ * @param x x-coordinate to interpolate
+ * @param y y-coordinate to interpolate
+ * @param src_img original image
+ * @param width image's width
+ * @param height image's height
+ * @returns interpolated value
+ */
 __device__ float bilinear_interpolation( const float x, 
                                          const float y, 
                                          const float* src_img,

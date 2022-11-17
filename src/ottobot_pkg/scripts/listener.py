@@ -34,7 +34,7 @@ def decodeMsg(msg):
 class DriverNode(object):
     def __init__(self):
         rospy.init_node('driver_node')
-        rospy.Subscriber('ottobot/key_teleop', Int8, self.callback)
+        rospy.Subscriber('/ottobot/key_teleop', Int8, self.callback)
         
         # Pin setup
         # IN1 HIGH & IN2 LOW -> RIGHT FWD
@@ -67,7 +67,6 @@ class DriverNode(object):
         rospy.spin()
 
     def callback(self, data):
-        # rospy.loginfo(rospy.get_caller_id() + "I heard %s", data.data)
         duty_cycle_r, duty_cycle_l = decodeMsg(data.data)
         # A negative value in duty means that the motor is going backwards
         

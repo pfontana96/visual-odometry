@@ -4,8 +4,9 @@ import time
 import logging
 import numpy as np
 
-WIDTH = 424
-HEIGHT = 240
+# See https://dev.intelrealsense.com/docs/tuning-depth-cameras-for-best-performance?_ga=2.192636586.1427882174.1667340741-1816843934.1656920574
+WIDTH = 848
+HEIGHT = 480
 
 class RealsenseD435i(object):
     def __init__(self, context, fps, enable_rgb=True, enable_depth=True, enable_imu=False, create_pc = False, device_id=None):
@@ -103,11 +104,12 @@ class RealsenseD435i(object):
 
     def get_intrinsics(self):
         frame = None
-        if self.enable_depth:
-            frame = self.profile.get_stream(rs.stream.depth)
-            depth_scale = self.profile.get_device().first_depth_sensor().get_depth_scale()
-        elif self.enable_rgb:
+        if self.enable_rgb:
+            # We're aligning to color (so this should be first option)
             frame = self.profile.get_stream(rs.stream.color)
+            depth_scale = self.profile.get_device().first_depth_sensor().get_depth_scale()
+        elif self.enable_depth:
+            frame = self.profile.get_stream(rs.stream.depth)
         
         if frame is None:
             logging.error("No camera stream is enabled")
@@ -190,11 +192,24 @@ class RealsenseD435i(object):
 
 if __name__ == "__main__":
     import cv2
+    from pathlib import Path
+    import yaml
+
     enable_rgb = True
     enable_depth = True
     enable_imu = False
-    create_pc = True
-    fps = 60
+    create_pc = False
+    fps = 15
+    enable_vis=False
+    # dataset_dir = None
+    dataset_dir = Path("/home/ottobot/handheld_data")
+    if dataset_dir is not None:
+        dataset_dir.mkdir(parents=True, exist_ok=True)
+        color_dir = dataset_dir / "rgb"
+        color_dir.mkdir(exist_ok=True)
+        depth_dir = dataset_dir / "depth"
+        depth_dir.mkdir(exist_ok=True)
+        intrinsics_file = dataset_dir / "camera_intrinsics.yaml"
 
     logging.getLogger().setLevel(logging.DEBUG)
 
@@ -218,12 +233,20 @@ if __name__ == "__main__":
     if len(cameras) == 0:
         logging.error("No device found...")
 
+    counter = 0
     try:
         while True:
             # Read camera
             color_image, depth_image, points, accel_x, accel_y, accel_z, gyro_x, gyro_y, gyro_z = cameras[0].poll()
-            cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
+            
+            if enable_vis:
+                cv2.namedWindow('RealSense', cv2.WINDOW_AUTOSIZE)
             # print("color image: {} | depth image: {}".format(type(color_image), type(depth_image)))
+
+            if dataset_dir is not None:
+                cv2.imwrite(str(color_dir / "{}.png".format(counter)), color_image)
+                cv2.imwrite(str(depth_dir / "{}.png".format(counter)), depth_image)
+
 
             depth_colormap = cv2.applyColorMap(cv2.convertScaleAbs(depth_image, alpha=0.03), cv2.COLORMAP_JET) if enable_depth else None
 
@@ -234,12 +257,22 @@ if __name__ == "__main__":
             elif enable_depth:
                 images = depth_image
 
-            if images is not None:
+            if (images is not None) and enable_vis:
                 cv2.imshow('RealSense', images)
 
             # Getting intrinsincs parameters
-            camera_matrix, coeffs = cameras[0].get_intrinsics()
-            logging.info("Camera_matrix:\n{}\nCoeffs:\n{}".format(camera_matrix, coeffs))
+            if counter == 0:
+                camera_matrix, coeffs, depth_scale = cameras[0].get_intrinsics()
+                logging.info("Camera_matrix:\n{}\nCoeffs:\n{}".format(camera_matrix, coeffs))
+
+                if dataset_dir is not None:
+                    data = {
+                        "intrinsics": camera_matrix.tolist(),
+                        "depth_scale": depth_scale,
+                        "coeffs": coeffs.tolist()
+                    }
+                    with intrinsics_file.open("w") as fp:
+                        yaml.dump(data, fp)
 
             # Print IMU
             if enable_imu:
@@ -252,8 +285,11 @@ if __name__ == "__main__":
             # Press 'q' or ESC to close window
             key =  cv2.waitKey(1)
             if key & 0xFF == ord('q') or key == 27:
-                cv2.destroyAllWindows()
+                if enable_vis:
+                    cv2.destroyAllWindows()
                 break
+
+            counter += 1
 
     except Exception as e:
         logging.error(e)

@@ -22,7 +22,7 @@ namespace otto {
 
     DVOROSNode::DVOROSNode(ros::NodeHandle& nh):
         sync(SyncPolicy(10), color_sub, depth_sub),
-        dvo(424, 240),
+        dvo(__DIRNAME__ + "config/camera_intrinsics.yaml", 424, 240),
         tf_listener(tf_buffer),
         rate(15)
     {

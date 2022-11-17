@@ -9,19 +9,26 @@
 #endif
 
 namespace otto{
-    GPUDenseVisualOdometry::GPUDenseVisualOdometry(const int width, const int height)
+    GPUDenseVisualOdometry::GPUDenseVisualOdometry(const std::string config_file, const int width, const int height)
     {
         width_ = width;
         height_ = height;
 
         first_frame = true;
 
-        // Camera intrinsics (HARDCODED FOR NOW)
-        cam_mat << 211.5657,        0, 210.5820,
-                          0, 211.5657, 119.4901,
-                          0,        0,        1;
+        // Load camera intrinsics
+        YAML::Node config = YAML::LoadFile(config_file);
         
-        scale = 0.001;
+        scale = config["scale"].as<float>();
+
+        int i = 0;
+        const YAML::Node& cam_node = config["camera_matrix"];
+        for(const auto& it : cam_node)
+        {
+            for(int j = 0; j < 3; j++)
+            cam_mat(i, j) = it[j].as<float>();
+            i++;
+        }
 
         // CUDA Unified Memory Allocation
         int U8C1_size = width*height*sizeof(char), U16C1_size = width*height*sizeof(short);
@@ -180,7 +187,8 @@ namespace otto{
         Eigen::Map<Mat4f> T(T_ptr);
         T = Mat4f::Identity();
 
-        float error_prev = std::numeric_limits<float>::max();
+        float error_prev = std::numeric_limits<float>::max(), error;
+        Vec6f delta_xi;
 
         float *H_ptr, *b_ptr;
         HANDLE_CUDA_ERROR(cudaMallocManaged((void**) &H_ptr, sizeof(float)*6*6));
@@ -194,15 +202,12 @@ namespace otto{
 
             compute_jacobian();
 
-            float error;
             error = call_newton_gauss_kernel(res_ptr, weights_ptr, J_ptr, H_ptr, b_ptr, width_*height_);
-
-            time_point end_gpu = Time::now();
 
             Eigen::Map<Eigen::Matrix<float, 6, 6, Eigen::RowMajor>> H(H_ptr, 6, 6);
             Eigen::Map<Vec6f> b(b_ptr, 6, 1);
 
-            Vec6f delta_xi = H.ldlt().solve(b);
+            delta_xi = H.ldlt().solve(b);
 
             // Update Pose estimation
             T = T*lie::SE3_exp(delta_xi);                  

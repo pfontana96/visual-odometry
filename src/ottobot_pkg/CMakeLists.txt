@@ -29,6 +29,9 @@ find_package(PCL REQUIRED COMPONENTS common io)
 link_directories(${PCL_LIBRARY_DIRS})
 add_definitions(${PCL_DEFINITIONS})
 
+# Find yaml-cpp
+find_package(yaml-cpp REQUIRED)
+
 # Import OpenCV library
 find_package(OpenCV 4 REQUIRED)
 if(OpenCV_FOUND)
@@ -90,19 +93,20 @@ target_include_directories( dvo PUBLIC
   ${catkin_INCLUDE_DIRS}
   ${EIGEN3_INCLUDE_DIR}
   ${manif_INCLUDE_DIRS}
+  ${YAML_CPP_INCLUDE_DIRS}
 )
 if(CMAKE_CUDA_COMPILER)
   set_target_properties(dvo PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   set_target_properties(dvo PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 endif(CMAKE_CUDA_COMPILER)
-target_link_libraries(dvo ${OpenCV_LIBRARIES})
+target_link_libraries(dvo ${OpenCV_LIBRARIES} yaml-cpp)
 
 if(CATKIN_ENABLE_TESTING)
   message(STATUS "dvo tests enabled")
   catkin_add_gtest(test_dvo test/dvo_tests.cpp)
   # target_include_directories(test_dvo PRIVATE 
   #   ${DVO_INCLUDE_DIRS})
-  target_link_libraries(test_dvo dvo)
+  target_link_libraries(test_dvo dvo yaml-cpp)
 endif()
 
 ## Nodes
