@@ -4,6 +4,9 @@
 #include <vector>
 #include <iterator>
 #include <cstddef>
+#include <string>
+#include <cassert>
+#include <iostream>
 
 #include <opencv4/opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -15,19 +18,26 @@ namespace otto {
             RGBDImagePyramid(const cv::Mat& gray_image, const cv::Mat& depth_image, const int levels);
             ~RGBDImagePyramid();
 
-            inline std::vector<cv::Mat> get_gray_pyramid() {
-                return gray_pyramid_;
+            inline cv::Mat get_gray_level(int level) {
+                assert((
+                    ("Got incorrect 'level': " + std::to_string(level) + " for pyramid with " + std::to_string(levels_) + " levels"),
+                    (level>=0) && (level<levels_)
+                ));
+                return gray_pyramid_[level];
             }
 
-            inline std::vector<cv::Mat> get_depth_pyramid() {
-                return depth_pyramid_;
+            inline cv::Mat get_depth_level(int level) {
+                assert((
+                    ("Got incorrect 'level': " + std::to_string(level) + " for pyramid with " + std::to_string(levels_) + " levels"),
+                    (level>=0) && (level<levels_)
+                ));
+                return depth_pyramid_[level];
             }
 
         private:
             // Attributes
             int current_level_, levels_;
             std::vector<cv::Mat> gray_pyramid_, depth_pyramid_;
-            cv::Mat gray_image_, depth_image_;
 
             // Methods
             void build_pyramid();

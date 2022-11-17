@@ -4,7 +4,7 @@ Further info on Lie's Algebra available on:
 */
 #include <iostream>
 
-#include <otto/utils/LieAlgebra.h>
+#include <utils/LieAlgebra.h>
 
 
 namespace otto {

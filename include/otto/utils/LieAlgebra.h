@@ -9,7 +9,7 @@
 #include <iostream>
 #include <cassert>
 
-#include <otto/utils/types.h>
+#include <utils/types.h>
 
 #define LIE_EPSILON 1e-6
 

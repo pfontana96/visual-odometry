@@ -5,8 +5,8 @@
 
 #include <eigen3/Eigen/Core>
 
-#include <otto/utils/LieAlgebra.h>
-#include <otto/utils/types.h>
+#include <utils/LieAlgebra.h>
+#include <utils/types.h>
 
 // SO3
 TEST(TestSO3, test__given_phi__when_hat__then_ok) {

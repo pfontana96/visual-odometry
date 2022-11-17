@@ -1,0 +1,5 @@
+numpy==1.23.*
+opencv-python==4.6.*
+pyyaml==6.0.*
+open3d
+numba~=0.56.3

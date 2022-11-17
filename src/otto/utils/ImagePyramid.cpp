@@ -1,4 +1,4 @@
-#include <otto/utils/ImagePyramid.h>
+#include <utils/ImagePyramid.h>
 
 namespace otto {
     RGBDImagePyramid::RGBDImagePyramid(const cv::Mat& gray_image, const cv::Mat& depth_image, const int levels): 
@@ -6,8 +6,8 @@ namespace otto {
         current_level_(0)
     {
         assert (("Expected 'levels' to be greater than 0.", levels > 0));
-        gray_pyramid_.push_back(gray_image_);
-        depth_pyramid_.push_back(depth_image_);
+        gray_pyramid_.push_back(gray_image);
+        depth_pyramid_.push_back(depth_image);
 
         build_pyramid();
     }
@@ -21,6 +21,7 @@ namespace otto {
             cv::pyrDown(depth_prev, depth);
             gray_pyramid_.push_back(gray);
             depth_pyramid_.push_back(depth);
+
         }
     }
 
