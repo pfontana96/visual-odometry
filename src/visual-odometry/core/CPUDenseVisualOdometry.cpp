@@ -34,79 +34,83 @@ namespace vo {
             return vo::core::CPUDenseVisualOdometry(levels, use_gpu, use_weighter, sigma, max_iterations, tolerance);
         }
 
-        void CPUDenseVisualOdometry::compute_residuals_and_jacobian_(
+        float CPUDenseVisualOdometry::compute_residuals_and_jacobian_(
             const cv::Mat& gray_image, const cv::Mat& gray_image_prev,
             const cv::Mat& depth_image_prev, Eigen::Ref<const vo::util::Mat4f> transform,
             const Eigen::Ref<const vo::util::Mat3f> intrinsics, const float depth_scale,
-            cv::Mat& residuals_out, vo::util::MatX6f& jacobian,
-            vo::util::NonLinearLeastSquaresSolver& solver
+            cv::Mat& residuals_out, vo::util::MatX6f& jacobian
         ) {
 
             float fx = intrinsics(0, 0), fy = intrinsics(1, 1), cx = intrinsics(0, 2), cy = intrinsics(1, 2);
+            float error = 0.0f, x, y, z, x1, y1, z1, gradx, grady, warped_x, warped_y, interpolated_intensity;
+            int count = 0;
 
-            #pragma omp parallel for collapse(2)
+            vo::util::Vec3f point;
+            Eigen::Matrix<float, 2, 6, Eigen::RowMajor> Jw;
+            Eigen::Matrix<float, 1, 2> Ji;
+            // #pragma omp parallel for collapse(2)
             for (size_t v = 0; v < gray_image.rows; v++) {
                 for (size_t u = 0; u < gray_image.cols; u++) {
 
-                    size_t jac_row_id = u + v * gray_image.cols;
+                    int jac_row_id = (int) u + (int) v * gray_image.cols;
 
                     // Deproject point to world
-                    float z = depth_image_prev.at<uint16_t>(v, u) * depth_scale;
+                    z = depth_image_prev.at<uint16_t>(v, u) * depth_scale;
 
                     if (z == 0.0f) {
                         // Invalid point
                         residuals_out.at<float>(v, u) = 0.0f;
-                        jacobian.row(jac_row_id) << vo::util::nan, vo::util::nan, vo::util::nan,
-                                                    vo::util::nan, vo::util::nan, vo::util::nan;
+                        jacobian.row(jac_row_id).setZero();
 
                         continue;
                     }
 
-                    float x = (u - cx) * z / fx, y = (v - cy) * z / fy;
+                    x = ((float) u - cx) * z / fx;
+                    y = ((float) v - cy) * z / fy;
+                    point << x, y, z;
 
                     // Transform point with estimate
-                    float x1 = transform(0, 0) * x + transform(0, 1) * y + transform(0, 2) * z + transform(0, 3);
-                    float y1 = transform(1, 0) * x + transform(1, 1) * y + transform(1, 2) * z + transform(1, 3);
-                    float z1 = transform(2, 0) * x + transform(2, 1) * y + transform(2, 2) * z + transform(2, 3);
+                    point = transform.topLeftCorner<3, 3>() * point + transform.topRightCorner<3, 1>();
+                    x1 = point(0);
+                    y1 = point(1);
+                    z1 = point(2);
 
-                    // Compute Jacobian
-                    // NOTE: `J_i(w(se3, x)) = [I2x(w(se3, x)), I2y(w(se3, x))].T`
-                    // can be approximated by `J_i = [I1x(x), I1y(x)].T`
-                    float gradx = vo::core::CPUDenseVisualOdometry::compute_gradient<uint8_t>(
+                    gradx = vo::core::CPUDenseVisualOdometry::compute_gradient<uint8_t>(
                         gray_image_prev, u, v, true
                     );
-                    float grady = vo::core::CPUDenseVisualOdometry::compute_gradient<uint8_t>(
+                    grady = vo::core::CPUDenseVisualOdometry::compute_gradient<uint8_t>(
                         gray_image_prev, u, v, false
                     );
 
-                    jacobian.row(jac_row_id) << fx * gradx / z1,
-                                                fy * grady / z1,
-                                                -fx * gradx * x1 / (z1 * z1) - fy * grady * y1 / (z1 * z1),
-                                                -fx * gradx * x1 * y1 / (z1 * z1) - fy * grady * (((y1 * y1) / (z1 * z1)) + 1),
-                                                fx * gradx * (((x1 * x1)/(z1 * z1)) + 1) + fy * grady * x1 * y1 / (z1 * z1),
-                                                -fx * gradx * y1 / z1 + fy * grady * x1 / z1;
+                    Jw << fx / z1,    0.0f, - fx * x1 / (z1*z1),         - fx * (x1 * y1) / (z1 * z1), fx * (1 + ((x1 * x1) / (z1 * z1))), - fx * y1 / z1,
+                             0.0f, fy / z1, - fy * y1 / (z1*z1), - fy * (1 + ((y1 * y1) / (z1 * z1))),           fy * x1 * y1 / (z1 * z1),   fy * x1 / z1;
+                    Ji << gradx, grady;
+                    
+                    jacobian.row(jac_row_id) << Ji * Jw;
 
                     // Deproject to second sensor plane
-                    float warped_x = fx * x1 / z1 + cx, warped_y = fy * y1 / z1 + cy;
+                    warped_x = (fx * x1 / z1) + cx, warped_y = (fy * y1 / z1) + cy;
 
                     // Interpolate value for I2
-                    float interpolated_intensity = vo::util::interpolate2dlinear(warped_x, warped_y, gray_image);
+                    interpolated_intensity = vo::util::interpolate2dlinear(warped_x, warped_y, gray_image);
 
                     if (!std::isfinite(interpolated_intensity)) {
                         // Invalid point
                         residuals_out.at<float>(v, u) = 0.0f;
-                        jacobian.row(jac_row_id) << vo::util::nan, vo::util::nan, vo::util::nan,
-                                                    vo::util::nan, vo::util::nan, vo::util::nan;
+                        jacobian.row(jac_row_id).setZero();
 
                         continue;
                     }
 
-                    residuals_out.at<float>(v, u) = interpolated_intensity - gray_image_prev.at<uint8_t>(v, u);
-
-                    // Update normal equations
-                    solver.update(jacobian.row(jac_row_id), residuals_out.at<float>(v, u));
+                    residuals_out.at<float>(v, u) = interpolated_intensity - (float) gray_image_prev.at<uint8_t>(v, u);
+                    error += residuals_out.at<float>(v, u) * residuals_out.at<float>(v, u);
+                    count++;
                 }
             }
+
+            error /= count;
+            
+            return error;
         }
     }
 }

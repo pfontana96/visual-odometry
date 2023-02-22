@@ -1,9 +1,15 @@
 cmake_minimum_required(VERSION 3.0.2)
 project(vo)
 
-## Compile as C++14
+## Compile as C++17
 add_compile_options(-std=c++17)
-set(CMAKE_CXX_FLAGS_RELEASE "-O3")
+# Enable fastmath
+# add_compile_options(-ffast-math)
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Release)
+endif()
+message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -Wextra")
 
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package(Eigen3 REQUIRED)

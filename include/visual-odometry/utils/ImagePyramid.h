@@ -26,7 +26,7 @@ namespace vo {
             cv::Mat in_smoothed;
             cv::medianBlur(in, in_smoothed, 3);
 
-            #pragma omp parallel for
+            // #pragma omp parallel for
             for(int y = 0; y < out.rows; ++y)
             {
                 for(int x = 0; x < out.cols; ++x)

@@ -74,48 +74,54 @@ namespace vo {
         void BaseDenseVisualOdometry::non_linear_least_squares_(Sophus::SE3f& estimate, const int level) {
 
             float error_prev = std::numeric_limits<float>::max();
-            // vo::util::Revertable<Sophus::SE3f> estimate(xi);
 
             cv::Size cv_size = current_rgbd_pyramid_.gray_at(level).size();
-            cv::Mat residuals(cv_size.height, cv_size.width, CV_32F);
+            cv::Mat residuals_image(cv_size.height, cv_size.width, CV_32F);
+
             vo::util::MatX6f jacobian(cv_size.height * cv_size.width, 6);
-            vo::util::Vec6f solution;
+            vo::util::Vec6f solution, b;
+            vo::util::Mat6f H;
+            Eigen::Map<vo::util::VecXf> residuals(
+                residuals_image.ptr<float>(), cv_size.height * cv_size.width
+            );
+
             Sophus::SE3f increment;
 
-            for (size_t it = 0; it < max_iterations_; it++) {
+            float error, error_diff;
 
-                solver_.reset();
+            for (size_t it = 0; it < (size_t) max_iterations_; it++) {
 
-                compute_residuals_and_jacobian_(
+                error = compute_residuals_and_jacobian_(
                     current_rgbd_pyramid_.gray_at(level), last_rgbd_pyramid_.gray_at(level),
                     last_rgbd_pyramid_.depth_at(level), estimate.matrix(), last_rgbd_pyramid_.intrinsics_at(level),
-                    depth_scale_, residuals, jacobian, solver_
+                    depth_scale_, residuals_image, jacobian
                 );
 
-                float error = solver_.solve(solution);
-                float error_diff = (error - error_prev);
+                // Solve Normal equations
+                H = jacobian.transpose() * jacobian;
+                b = -jacobian.transpose() * residuals;
+                solution = H.ldlt().solve(b);
+
+                error_diff = (error - error_prev);
 
                 if ( error_diff < 0.0) {
                     // Error decrease so update estimate
                     increment = Sophus::SE3f::exp(solution.cast<float>());
-                    estimate = increment.inverse() * estimate;
+                    estimate = increment * estimate;
 
                     if (abs(error_diff) <= tolerance_) {
-                        std::cout << "Found convergence at iteration '" << std::to_string(it) << "' (error: " <<
-                        std::to_string(error) << ")" << std::endl;
+                        std::cout << "Found convergence at iteration '" << it
+                        << "' (error: " << error << ")" << std::endl;
                         break;
                     }
 
                 } else {
-                    std::cout << "Error increased at iteration '" << it << "'" << std::endl;
+                    std::cout << "Error '" << error << "' increased at iteration '" << it << "'" << std::endl;
                     break;
                 }
 
-                std::cout << "Iteration '" << it << "' (error: " << error << ")" << std::endl;
-
-                if (it == (max_iterations_ - 1)) {
-                    std::cout << "Exceeded maximum number of iterations '" << std::to_string(max_iterations_) <<
-                    "'" << std::endl;
+                if (it == ((size_t) max_iterations_ - 1)) {
+                    std::cout << "Exceeded maximum number of iterations '" << max_iterations_ << "'" << std::endl;
                 }
 
                 error_prev = error;

@@ -18,7 +18,6 @@
 
 #include <utils/types.h>
 #include <utils/ImagePyramid.h>
-#include <utils/NonLinLstSqSolver.h>
 
 namespace vo {
     namespace core {
@@ -63,17 +62,14 @@ namespace vo {
 
                 Sophus::SE3f last_estimate_;
 
-                vo::util::NonLinearLeastSquaresSolver solver_;
-
                 // Methods
                 void non_linear_least_squares_(Sophus::SE3f& xi, const int level);
 
-                virtual void compute_residuals_and_jacobian_(
+                virtual float compute_residuals_and_jacobian_(
                     const cv::Mat& gray_image, const cv::Mat& gray_image_prev,
                     const cv::Mat& depth_image_prev, Eigen::Ref<const vo::util::Mat4f> transform,
                     const Eigen::Ref<const vo::util::Mat3f> intrinsics, const float depth_scale,
-                    cv::Mat& residuals_out, vo::util::MatX6f& jacobian,
-                    vo::util::NonLinearLeastSquaresSolver& solver
+                    cv::Mat& residuals_out, vo::util::MatX6f& jacobian
                 ) = 0;
 
                 inline void update_last_pyramid() {

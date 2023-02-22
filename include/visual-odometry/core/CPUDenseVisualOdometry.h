@@ -21,12 +21,11 @@ namespace vo {
                 );
                 ~CPUDenseVisualOdometry();
 
-                void compute_residuals_and_jacobian_(
+                float compute_residuals_and_jacobian_(
                     const cv::Mat& gray_image, const cv::Mat& gray_image_prev,
                     const cv::Mat& depth_image_prev, Eigen::Ref<const vo::util::Mat4f> transform,
                     const Eigen::Ref<const vo::util::Mat3f> intrinsics, const float depth_scale,
-                    cv::Mat& residuals_out, vo::util::MatX6f& jacobian,
-                    vo::util::NonLinearLeastSquaresSolver& solver
+                    cv::Mat& residuals_out, vo::util::MatX6f& jacobian
                 ) override;
 
                 static vo::core::CPUDenseVisualOdometry load_from_yaml(const std::string filename);
@@ -44,7 +43,7 @@ namespace vo {
                         next_value = image.at<T>(std::min<int>(y + 1, image.rows - 1), x);
                     }
 
-                    return 0.5f * (next_value - prev_value);
+                    return 0.5f * ((float) (next_value - prev_value));
                 };
 
         };
