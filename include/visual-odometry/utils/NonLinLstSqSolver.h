@@ -27,7 +27,12 @@ namespace vo {
                 );
 
                 void reset();
+
                 float solve(vo::util::Vec6f& solution);
+
+                inline int count() {
+                    return count_;
+                }
 
             private:
                 // Attributes

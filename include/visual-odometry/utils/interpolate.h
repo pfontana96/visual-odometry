@@ -2,10 +2,11 @@
 #define UTIL_INTERPOLATE
 
 #include <cmath>
-#include <limits>
 
 #include <opencv4/opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
+
+#include <utils/types.h>
 
 
 namespace vo {

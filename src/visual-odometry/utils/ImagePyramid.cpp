@@ -46,7 +46,7 @@ namespace vo {
             depth_pyramid_.push_back(depth_image);
             intrinsics_.push_back(intrinsics);
 
-            for(size_t i = 1; i < levels_; i++) {
+            for(int i = 1; i < levels_; i++) {
 
                 cv::Mat gray, depth;
                 vo::util::pyrDownMedianSmooth<uint8_t>(gray_pyramid_[i - 1], gray);
@@ -60,7 +60,6 @@ namespace vo {
                                 0.0, powf(2, -i), powf(2, -i - 1) - 0.5,
                                 0.0, 0.0, 1.0;
                 intrinsics_.push_back(scale_matrix * intrinsics_[i - 1]);
-
             }
 
             empty_ = false;

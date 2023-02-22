@@ -21,27 +21,6 @@ namespace vo {
         BaseDenseVisualOdometry::~BaseDenseVisualOdometry(){};
 
         /**
-         * @brief Loads Dense Visual Odometry from YAML config file
-         * 
-         * @param filename 
-         * @return vo::core::BaseDenseVisualOdometry 
-         */
-        vo::core::BaseDenseVisualOdometry BaseDenseVisualOdometry::load_from_yaml(const std::string filename) {
-
-            vo::util::YAMLLoader loader(filename);
-
-            // Load necessary parameters from YAML file
-            int levels = loader.get_value<int>("levels");
-            bool use_gpu = loader.get_value<bool>("use_gpu");
-            bool use_weighter = loader.get_value<bool>("use_weighter");
-            float sigma = loader.get_value<float>("sigma");
-            int max_iterations = loader.get_value<int>("max_iterations");
-            float tolerance = loader.get_value<float>("tolerance");
-
-            return vo::core::BaseDenseVisualOdometry(levels, use_gpu, use_weighter, sigma, max_iterations, tolerance);
-        }
-
-        /**
          * @brief Estimates the transform between the last frame and the current one.
          * 
          * @param color_image Color image of current frame.
@@ -80,7 +59,7 @@ namespace vo {
                 init_guess.topLeftCorner<3, 3>(), init_guess.topRightCorner<3, 1>()
             );
 
-            for (size_t i = 0; i < levels_; i++){
+            for (int i = levels_ - 1; i >= 0; i--){
                 non_linear_least_squares_(estimate, i);
             }
 
@@ -110,16 +89,8 @@ namespace vo {
                 compute_residuals_and_jacobian_(
                     current_rgbd_pyramid_.gray_at(level), last_rgbd_pyramid_.gray_at(level),
                     last_rgbd_pyramid_.depth_at(level), estimate.matrix(), last_rgbd_pyramid_.intrinsics_at(level),
-                    residuals, jacobian
+                    depth_scale_, residuals, jacobian, solver_
                 );
-
-                #pragma omp parallel for collapse(2)
-                for (size_t y = 0; y < cv_size.height; y++) {
-                    for (size_t x = 0; x < cv_size.width; x++) {
-                        int row_id = x + y * cv_size.width;
-                        solver_.update(jacobian.row(row_id), residuals.at<float>(y, x));
-                    }
-                }
 
                 float error = solver_.solve(solution);
                 float error_diff = (error - error_prev);
@@ -134,12 +105,20 @@ namespace vo {
                         std::to_string(error) << ")" << std::endl;
                         break;
                     }
+
+                } else {
+                    std::cout << "Error increased at iteration '" << it << "'" << std::endl;
+                    break;
                 }
+
+                std::cout << "Iteration '" << it << "' (error: " << error << ")" << std::endl;
 
                 if (it == (max_iterations_ - 1)) {
                     std::cout << "Exceeded maximum number of iterations '" << std::to_string(max_iterations_) <<
                     "'" << std::endl;
                 }
+
+                error_prev = error;
             }
         }
     } // core

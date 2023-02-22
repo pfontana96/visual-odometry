@@ -4,9 +4,9 @@
 
 namespace py = pybind11;
 
-void init_base_dense_visual_odometry_submodule(py::module &);
+void init_cpu_dense_visual_odometry_submodule(py::module &);
 
 void init_core_submodule(py::module &m) {
     py::module core = m.def_submodule("core");
-    init_base_dense_visual_odometry_submodule(core);
+    init_cpu_dense_visual_odometry_submodule(core);
 }

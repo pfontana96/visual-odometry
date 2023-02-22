@@ -8,7 +8,7 @@ namespace vo {
 
             // Return nan if coordiante lies outside of image grid
             if ((x0 < 0) || (y0 < 0) || (x1 >= gray_image.cols) || (y1 >= gray_image.rows)){
-                return std::numeric_limits<double>::quiet_NaN();
+                return vo::util::nan;
             }
 
             float w00 = (x1 - x) * (y1 - y), w01 = (x1 - x) * (y - y0), w10 = (x - x0) * (y1 - y), w11 = (x - x0) * (y - y0);
