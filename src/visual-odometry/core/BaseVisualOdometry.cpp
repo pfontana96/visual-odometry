@@ -3,8 +3,7 @@
 namespace vo {
     namespace core {
         BaseDenseVisualOdometry::BaseDenseVisualOdometry(
-            const int levels, const bool use_gpu, const bool use_weighter, const float sigma,
-            const int max_iterations, const float tolerance
+            int levels, bool use_gpu, bool use_weighter, float sigma, int max_iterations, float tolerance
         ):
             levels_(levels),
             use_gpu_(use_gpu),
@@ -66,7 +65,7 @@ namespace vo {
             return estimate;
         }
 
-        void BaseDenseVisualOdometry::non_linear_least_squares_(vo::util::Mat4f& estimate, const int level) {
+        void BaseDenseVisualOdometry::non_linear_least_squares_(Eigen::Ref<vo::util::Mat4f> estimate, int level) {
 
             float error_prev = std::numeric_limits<float>::max();
 

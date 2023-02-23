@@ -5,8 +5,7 @@ namespace vo {
     namespace core {
 
         CPUDenseVisualOdometry::CPUDenseVisualOdometry(
-            const int levels, const bool use_gpu, const bool use_weighter, const float sigma,
-            const int max_iterations, const float tolerance
+            int levels, bool use_gpu, bool use_weighter, float sigma, int max_iterations, float tolerance
         ) :
             BaseDenseVisualOdometry(levels, use_gpu, use_weighter, sigma, max_iterations, tolerance)
         {}
@@ -36,9 +35,9 @@ namespace vo {
 
         int CPUDenseVisualOdometry::compute_residuals_and_jacobian_(
             const cv::Mat& gray_image, const cv::Mat& gray_image_prev,
-            const cv::Mat& depth_image_prev, Eigen::Ref<const vo::util::Mat4f> transform,
-            const Eigen::Ref<const vo::util::Mat3f> intrinsics, const float depth_scale,
-            cv::Mat& residuals_out, vo::util::MatX6f& jacobian
+            const cv::Mat& depth_image_prev, const Eigen::Ref<const vo::util::Mat4f> transform,
+            const Eigen::Ref<const vo::util::Mat3f> intrinsics, float depth_scale,
+            cv::Mat& residuals_out, Eigen::Ref<vo::util::MatX6f> jacobian
         ) {
 
             float fx = intrinsics(0, 0), fy = intrinsics(1, 1), cx = intrinsics(0, 2), cy = intrinsics(1, 2);

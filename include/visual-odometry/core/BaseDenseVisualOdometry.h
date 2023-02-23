@@ -32,8 +32,7 @@ namespace vo {
             public:
 
                 BaseDenseVisualOdometry(
-                    const int levels, const bool use_gpu, const bool use_weighter, const float sigma,
-                    const int max_iterations, const float tolerance
+                    int levels, bool use_gpu, bool use_weighter, float sigma, int max_iterations, float tolerance
                 );
                 virtual ~BaseDenseVisualOdometry();
 
@@ -43,8 +42,8 @@ namespace vo {
                 );
 
                 inline void update_camera_info(
-                    Eigen::Ref<const vo::util::Mat3f> new_camera_intrinsics, const int new_height, const int new_width,
-                    const float new_depth_scale
+                    const Eigen::Ref<const vo::util::Mat3f> new_camera_intrinsics,
+                    int new_height, int new_width, float new_depth_scale
                 ) {
                     height_ = new_height;
                     width_ = new_width;
@@ -68,13 +67,13 @@ namespace vo {
                 vo::util::Mat4f last_estimate_;
 
                 // Methods
-                void non_linear_least_squares_(vo::util::Mat4f& xi, const int level);
+                void non_linear_least_squares_(Eigen::Ref<vo::util::Mat4f> xi, int level);
 
                 virtual int compute_residuals_and_jacobian_(
                     const cv::Mat& gray_image, const cv::Mat& gray_image_prev,
-                    const cv::Mat& depth_image_prev, Eigen::Ref<const vo::util::Mat4f> transform,
-                    const Eigen::Ref<const vo::util::Mat3f> intrinsics, const float depth_scale,
-                    cv::Mat& residuals_out, vo::util::MatX6f& jacobian
+                    const cv::Mat& depth_image_prev, const Eigen::Ref<const vo::util::Mat4f> transform,
+                    const Eigen::Ref<const vo::util::Mat3f> intrinsics, float depth_scale,
+                    cv::Mat& residuals_out, Eigen::Ref<vo::util::MatX6f> jacobian
                 ) = 0;
 
                 inline void update_last_pyramid() {

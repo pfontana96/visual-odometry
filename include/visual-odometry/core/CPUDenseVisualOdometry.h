@@ -16,22 +16,21 @@ namespace vo {
             public:
 
                 CPUDenseVisualOdometry(
-                    const int levels, const bool use_gpu, const bool use_weighter, const float sigma,
-                    const int max_iterations, const float tolerance
+                    int levels, bool use_gpu, bool use_weighter, float sigma, int max_iterations, float tolerance
                 );
                 ~CPUDenseVisualOdometry();
 
                 int compute_residuals_and_jacobian_(
                     const cv::Mat& gray_image, const cv::Mat& gray_image_prev,
-                    const cv::Mat& depth_image_prev, Eigen::Ref<const vo::util::Mat4f> transform,
-                    const Eigen::Ref<const vo::util::Mat3f> intrinsics, const float depth_scale,
-                    cv::Mat& residuals_out, vo::util::MatX6f& jacobian
+                    const cv::Mat& depth_image_prev, const Eigen::Ref<const vo::util::Mat4f> transform,
+                    const Eigen::Ref<const vo::util::Mat3f> intrinsics, float depth_scale,
+                    cv::Mat& residuals_out, Eigen::Ref<vo::util::MatX6f> jacobian
                 ) override;
 
                 static vo::core::CPUDenseVisualOdometry load_from_yaml(const std::string filename);
 
                 template<typename T>
-                static inline float compute_gradient(const cv::Mat& image, const int x, const int y, const bool x_direction) {
+                static inline float compute_gradient(const cv::Mat& image, int x, int y, bool x_direction) {
                     
                     T prev_value, next_value;
 
