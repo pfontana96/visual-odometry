@@ -1,0 +1,6 @@
+levels: 3
+sigma: 20.0
+max_iterations: 100
+use_gpu: false
+use_weighter: true
+tolerance: 0.00001

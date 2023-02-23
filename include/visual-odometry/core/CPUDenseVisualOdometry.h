@@ -31,7 +31,7 @@ namespace vo {
                 static vo::core::CPUDenseVisualOdometry load_from_yaml(const std::string filename);
 
                 template<typename T>
-                static float compute_gradient(const cv::Mat& image, const int x, const int y, const bool x_direction) {
+                static inline float compute_gradient(const cv::Mat& image, const int x, const int y, const bool x_direction) {
                     
                     T prev_value, next_value;
 
@@ -45,7 +45,6 @@ namespace vo {
 
                     return 0.5f * ((float) (next_value - prev_value));
                 };
-
         };
     } // namespace core
 } // namespace vo

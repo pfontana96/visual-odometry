@@ -123,11 +123,22 @@ class CMakeBuild(build_ext):
         )
 
 
+def get_version() -> str:
+    version_file = Path(__file__).resolve().parent / "VERSION"
+
+    if not version_file.exists():
+        raise FileNotFoundError("VERSION File not found at '{}'".format(str(version_file)))
+
+    with version_file.open("r") as fp:
+        content = fp.readlines()
+
+    return content[0]  # VERSION should be a single line file consisting of version on its first line
+
 # The information here can also be placed in setup.cfg - better separation of
 # logic and declaration, and simpler if you include description/version in a file.
 setup(
     name="visual-odometry",
-    version="0.0.1",
+    version=get_version(),
     author="Pedro Fontana",
     author_email="pedro.fontana.1996@gmail.com",
     description="Python lib to perform Visual Odometry",

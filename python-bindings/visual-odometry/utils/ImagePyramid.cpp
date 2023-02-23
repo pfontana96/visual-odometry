@@ -10,11 +10,9 @@
 
 namespace py = pybind11;
 
-void init_image_pyramid_submodule(py::module &utils) {
+void init_image_pyramid(py::module &utils) {
 
-    py::module image_pyramid = utils.def_submodule("image_pyramid");
-
-    py::class_<vo::util::RGBDImagePyramid>(image_pyramid, "RGBDImagePyramid")
+    py::class_<vo::util::RGBDImagePyramid>(utils, "RGBDImagePyramid")
         .def(
             py::init<const int>(),
             "Initializes RGBD Image Pyramid",

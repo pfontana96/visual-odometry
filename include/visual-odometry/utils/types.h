@@ -17,6 +17,7 @@ namespace vo {
         using Mat6f = Eigen::Matrix<float, 6, 6, Eigen::RowMajor>;
         using MatX6f = Eigen::Matrix<float, Eigen::Dynamic, 6, Eigen::RowMajor>;
         using Vec3f = Eigen::Matrix<float, 3, 1>;
+        using Vec4f = Eigen::Matrix<float, 4, 1>;
         using Vec6f = Eigen::Matrix<float, 6, 1>;
         using VecXf = Eigen::Matrix<float, Eigen::Dynamic, 1>;
 

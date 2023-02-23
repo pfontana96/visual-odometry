@@ -75,6 +75,8 @@ namespace vo {
                     y1 = point(1);
                     z1 = point(2);
 
+                    // NOTE: `J_i(w(se3, x)) = [I2x(w(se3, x)), I2y(w(se3, x))].T`
+                    // can be approximated by `J_i = [I1x(x), I1y(x)].T`
                     gradx = vo::core::CPUDenseVisualOdometry::compute_gradient<uint8_t>(
                         gray_image_prev, u, v, true
                     );
@@ -109,5 +111,5 @@ namespace vo {
 
             return count;
         }
-    }
-}
+    } // namespace core
+} // namespace vo

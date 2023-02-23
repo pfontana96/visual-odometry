@@ -115,6 +115,8 @@ namespace vo {
 
                 H = jacobian.transpose() * weights.asDiagonal() * jacobian;
                 b = -jacobian.transpose() * weights.asDiagonal() * residuals;
+                // H = jacobian.transpose().cwiseProduct(weights) * jacobian;
+                // b = -jacobian.transpose() * residuals.cwiseProduct(weights);
 
                 solution = H.ldlt().solve(b);
 
@@ -142,6 +144,9 @@ namespace vo {
 
                 error_prev = error;
             }
+
+            std::cout << "Residuals (min, max, mean): (" << residuals.minCoeff() << ", " << residuals.maxCoeff() << ", "
+            << residuals.mean() << ")" << std::endl; 
 
             delete weighter_;
         }
