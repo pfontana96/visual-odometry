@@ -65,10 +65,10 @@ namespace vo {
                 vo::util::Mat3f intrinsics_;
                 float depth_scale_;
 
-                Sophus::SE3f last_estimate_;
+                vo::util::Mat4f last_estimate_;
 
                 // Methods
-                void non_linear_least_squares_(Sophus::SE3f& xi, const int level);
+                void non_linear_least_squares_(vo::util::Mat4f& xi, const int level);
 
                 virtual int compute_residuals_and_jacobian_(
                     const cv::Mat& gray_image, const cv::Mat& gray_image_prev,

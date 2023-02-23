@@ -210,7 +210,7 @@ def _load_tum_benchmark(data_path: Path, size: int = None):
         rgb_images_paths = rgb_images_paths[:size]
         depth_images_paths = depth_images_paths[:size]
         frames_timestamps = frames_timestamps[:size]
-        gt_timestamps[:size]
+        gt_timestamps = gt_timestamps[:size]
 
     rgb_images = []
     depth_images = []
