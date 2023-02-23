@@ -77,29 +77,45 @@ namespace vo {
 
             cv::Size cv_size = current_rgbd_pyramid_.gray_at(level).size();
             cv::Mat residuals_image(cv_size.height, cv_size.width, CV_32F);
-
-            vo::util::MatX6f jacobian(cv_size.height * cv_size.width, 6);
-            vo::util::Vec6f solution, b;
-            vo::util::Mat6f H;
             Eigen::Map<vo::util::VecXf> residuals(
                 residuals_image.ptr<float>(), cv_size.height * cv_size.width
             );
 
+            cv::Mat weights_image(cv_size.height, cv_size.width, CV_32F);
+            Eigen::Map<vo::util::VecXf> weights(
+                weights_image.ptr<float>(), cv_size.height * cv_size.width
+            );
+
+            vo::weighter::BaseWeighter *weighter_;
+            if (use_weighter_){
+                weighter_ = new vo::weighter::TDistributionWeighter(5, 5.0, 0.001, 50);
+            } else {
+                weighter_ = new vo::weighter::UniformWeighter();
+            }
+
+            vo::util::MatX6f jacobian(cv_size.height * cv_size.width, 6);
+            vo::util::Vec6f solution, b;
+            vo::util::Mat6f H;
+
             Sophus::SE3f increment;
 
-            float error, error_diff;
+            float count, error, error_diff;
 
             for (size_t it = 0; it < (size_t) max_iterations_; it++) {
 
-                error = compute_residuals_and_jacobian_(
+                count = compute_residuals_and_jacobian_(
                     current_rgbd_pyramid_.gray_at(level), last_rgbd_pyramid_.gray_at(level),
                     last_rgbd_pyramid_.depth_at(level), estimate.matrix(), last_rgbd_pyramid_.intrinsics_at(level),
                     depth_scale_, residuals_image, jacobian
                 );
 
                 // Solve Normal equations
-                H = jacobian.transpose() * jacobian;
-                b = -jacobian.transpose() * residuals;
+                error = weighter_->weight(residuals_image, weights_image);
+                error /= count;
+
+                H = jacobian.transpose() * weights.asDiagonal() * jacobian;
+                b = -jacobian.transpose() * weights.asDiagonal() * residuals;
+
                 solution = H.ldlt().solve(b);
 
                 error_diff = (error - error_prev);
@@ -126,6 +142,8 @@ namespace vo {
 
                 error_prev = error;
             }
+
+            delete weighter_;
         }
     } // core
 } // vo

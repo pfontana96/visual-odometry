@@ -19,6 +19,11 @@
 #include <utils/types.h>
 #include <utils/ImagePyramid.h>
 
+#include <weighter/BaseWeighter.h>
+#include <weighter/TDistributionWeighter.h>
+#include <weighter/UniformWeighter.h>
+
+
 namespace vo {
     namespace core {
 
@@ -30,7 +35,7 @@ namespace vo {
                     const int levels, const bool use_gpu, const bool use_weighter, const float sigma,
                     const int max_iterations, const float tolerance
                 );
-                ~BaseDenseVisualOdometry();
+                virtual ~BaseDenseVisualOdometry();
 
                 vo::util::Mat4f step(
                     const cv::Mat& color_image, const cv::Mat &depth_image,
@@ -65,7 +70,7 @@ namespace vo {
                 // Methods
                 void non_linear_least_squares_(Sophus::SE3f& xi, const int level);
 
-                virtual float compute_residuals_and_jacobian_(
+                virtual int compute_residuals_and_jacobian_(
                     const cv::Mat& gray_image, const cv::Mat& gray_image_prev,
                     const cv::Mat& depth_image_prev, Eigen::Ref<const vo::util::Mat4f> transform,
                     const Eigen::Ref<const vo::util::Mat3f> intrinsics, const float depth_scale,

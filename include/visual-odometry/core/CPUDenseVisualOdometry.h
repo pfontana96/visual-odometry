@@ -21,7 +21,7 @@ namespace vo {
                 );
                 ~CPUDenseVisualOdometry();
 
-                float compute_residuals_and_jacobian_(
+                int compute_residuals_and_jacobian_(
                     const cv::Mat& gray_image, const cv::Mat& gray_image_prev,
                     const cv::Mat& depth_image_prev, Eigen::Ref<const vo::util::Mat4f> transform,
                     const Eigen::Ref<const vo::util::Mat3f> intrinsics, const float depth_scale,

@@ -34,7 +34,7 @@ namespace vo {
             return vo::core::CPUDenseVisualOdometry(levels, use_gpu, use_weighter, sigma, max_iterations, tolerance);
         }
 
-        float CPUDenseVisualOdometry::compute_residuals_and_jacobian_(
+        int CPUDenseVisualOdometry::compute_residuals_and_jacobian_(
             const cv::Mat& gray_image, const cv::Mat& gray_image_prev,
             const cv::Mat& depth_image_prev, Eigen::Ref<const vo::util::Mat4f> transform,
             const Eigen::Ref<const vo::util::Mat3f> intrinsics, const float depth_scale,
@@ -42,7 +42,7 @@ namespace vo {
         ) {
 
             float fx = intrinsics(0, 0), fy = intrinsics(1, 1), cx = intrinsics(0, 2), cy = intrinsics(1, 2);
-            float error = 0.0f, x, y, z, x1, y1, z1, gradx, grady, warped_x, warped_y, interpolated_intensity;
+            float x, y, z, x1, y1, z1, gradx, grady, warped_x, warped_y, interpolated_intensity;
             int count = 0;
 
             vo::util::Vec3f point;
@@ -59,7 +59,7 @@ namespace vo {
 
                     if (z == 0.0f) {
                         // Invalid point
-                        residuals_out.at<float>(v, u) = 0.0f;
+                        residuals_out.at<float>(v, u) = vo::util::nan; // Residuals NaN are converted to zeros by weighter later
                         jacobian.row(jac_row_id).setZero();
 
                         continue;
@@ -96,21 +96,18 @@ namespace vo {
 
                     if (!std::isfinite(interpolated_intensity)) {
                         // Invalid point
-                        residuals_out.at<float>(v, u) = 0.0f;
+                        residuals_out.at<float>(v, u) = vo::util::nan; // Residuals NaN are converted to zeros by weighter later
                         jacobian.row(jac_row_id).setZero();
 
                         continue;
                     }
 
                     residuals_out.at<float>(v, u) = interpolated_intensity - (float) gray_image_prev.at<uint8_t>(v, u);
-                    error += residuals_out.at<float>(v, u) * residuals_out.at<float>(v, u);
                     count++;
                 }
             }
 
-            error /= count;
-            
-            return error;
+            return count;
         }
     }
 }
