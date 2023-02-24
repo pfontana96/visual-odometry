@@ -3,8 +3,7 @@
 namespace vo {
     namespace core {
         BaseDenseVisualOdometry::BaseDenseVisualOdometry(
-            const int levels, const bool use_gpu, const bool use_weighter, const float sigma,
-            const int max_iterations, const float tolerance
+            int levels, bool use_gpu, bool use_weighter, float sigma, int max_iterations, float tolerance
         ):
             levels_(levels),
             use_gpu_(use_gpu),
@@ -66,7 +65,7 @@ namespace vo {
             return estimate;
         }
 
-        void BaseDenseVisualOdometry::non_linear_least_squares_(vo::util::Mat4f& estimate, const int level) {
+        void BaseDenseVisualOdometry::non_linear_least_squares_(Eigen::Ref<vo::util::Mat4f> estimate, int level) {
 
             float error_prev = std::numeric_limits<float>::max();
 
@@ -92,7 +91,7 @@ namespace vo {
             vo::util::Vec6f solution, b;
             vo::util::Mat6f H;
 
-            Sophus::SE3f increment;
+            Sophus::SE3f increment, old(last_estimate_), xi(estimate);
 
             float count, error, error_diff;
 
@@ -100,19 +99,23 @@ namespace vo {
 
                 count = compute_residuals_and_jacobian_(
                     current_rgbd_pyramid_.gray_at(level), last_rgbd_pyramid_.gray_at(level),
-                    last_rgbd_pyramid_.depth_at(level), estimate, last_rgbd_pyramid_.intrinsics_at(level),
+                    last_rgbd_pyramid_.depth_at(level), xi.matrix(), last_rgbd_pyramid_.intrinsics_at(level),
                     depth_scale_, residuals_image, jacobian
                 );
 
                 // Solve Normal equations
                 error = weighter_->weight(residuals_image, weights_image);
-                error /= count;
-                std::cout << "Valid points " << count << std::endl;
+                error /= (float) count;
 
                 H = jacobian.transpose() * weights.asDiagonal() * jacobian;
-                b = - (jacobian.transpose() * weights.asDiagonal() * residuals);
+                b = - (jacobian.transpose() * residuals.cwiseProduct(weights));
                 // H = jacobian.transpose().cwiseProduct(weights) * jacobian;
                 // b = -jacobian.transpose() * residuals.cwiseProduct(weights);
+
+                if (sigma_ > 0.0f) {
+                    H += ((1 / sigma_) * vo::util::Mat6f::Identity());
+                    b += ((1 / sigma_) * old.log());
+                }
 
                 solution = H.ldlt().solve(b);
 
@@ -121,7 +124,11 @@ namespace vo {
                 if ( error_diff < 0.0) {
                     // Error decrease so update estimate
                     increment = Sophus::SE3f::exp(solution.cast<float>());
-                    estimate = increment.matrix() * estimate;
+                    xi = increment * xi;
+
+                    if (sigma_ > 0.0f) {
+                        old = increment.inverse() * old;
+                    }
 
                     if (abs(error_diff) <= tolerance_) {
                         std::cout << "Found convergence at iteration '" << it
@@ -141,10 +148,10 @@ namespace vo {
                 error_prev = error;
             }
 
-            std::cout << "Residuals (min, max, mean): (" << residuals.minCoeff() << ", " << residuals.maxCoeff() << ", "
-            << residuals.mean() << ")" << std::endl; 
-
             delete weighter_;
+
+            estimate = xi.matrix();
+
         }
     } // core
 } // vo
