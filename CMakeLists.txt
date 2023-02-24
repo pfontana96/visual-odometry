@@ -83,6 +83,7 @@ target_link_libraries(
     ${OpenCV_LIBRARIES}
     Sophus::Sophus
     ${YAML_CPP_LIBRARIES}
+    # $<$<BOOL:${OpenMP_FOUND}>:OpenMP::OpenMP_CXX>
 )
 
 # Python bindings

@@ -267,8 +267,6 @@ def main():
         else:
             accumulated_transform = accumulated_transform @ inverse(transform)
 
-        # logger.info("Pose: {} Gt:{}".format(accumulated_transform[:3, 3].tolist(), gt_transform))
-
         # Error is only the euclidean distance (not taking rotation into account)
         if gt_transform is not None:
             t_error = float(np.linalg.norm(accumulated_transform[:3, 3] - gt_transform[:3, 3]))

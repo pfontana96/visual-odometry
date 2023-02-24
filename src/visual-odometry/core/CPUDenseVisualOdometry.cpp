@@ -41,13 +41,14 @@ namespace vo {
         ) {
 
             float fx = intrinsics(0, 0), fy = intrinsics(1, 1), cx = intrinsics(0, 2), cy = intrinsics(1, 2);
-            float x, y, z, x1, y1, z1, gradx, grady, warped_x, warped_y, interpolated_intensity;
+            float x, y, z, gradx, grady, warped_x, warped_y, interpolated_intensity;
             int count = 0;
 
             vo::util::Vec3f point;
             Eigen::Matrix<float, 2, 6, Eigen::RowMajor> Jw;
             Eigen::Matrix<float, 1, 2> Ji;
-            // #pragma omp parallel for collapse(2)
+
+            // #pragma omp parallel for private(Jw, Ji) shared(count)
             for (size_t v = 0; v < gray_image.rows; v++) {
                 for (size_t u = 0; u < gray_image.cols; u++) {
 
@@ -66,13 +67,13 @@ namespace vo {
 
                     x = ((float) u - cx) * z / fx;
                     y = ((float) v - cy) * z / fy;
-                    point << x, y, z;
+                    point = {x, y, z};
 
                     // Transform point with estimate
                     point = transform.topLeftCorner<3, 3>() * point + transform.topRightCorner<3, 1>();
-                    x1 = point(0);
-                    y1 = point(1);
-                    z1 = point(2);
+                    x = point(0);
+                    y = point(1);
+                    z = point(2);
 
                     // NOTE: `J_i(w(se3, x)) = [I2x(w(se3, x)), I2y(w(se3, x))].T`
                     // can be approximated by `J_i = [I1x(x), I1y(x)].T`
@@ -83,14 +84,14 @@ namespace vo {
                         gray_image_prev, u, v, false
                     );
 
-                    Jw << fx / z1,    0.0f, - fx * x1 / (z1*z1),         - fx * (x1 * y1) / (z1 * z1), fx * (1 + ((x1 * x1) / (z1 * z1))), - fx * y1 / z1,
-                             0.0f, fy / z1, - fy * y1 / (z1*z1), - fy * (1 + ((y1 * y1) / (z1 * z1))),           fy * x1 * y1 / (z1 * z1),   fy * x1 / z1;
+                    Jw << fx / z,    0.0f, - fx * x / (z * z),         - fx * (x * y) / (z * z), fx * (1 + ((x * x) / (z * z))), - fx * y / z,
+                             0.0f, fy / z, - fy * y / (z * z), - fy * (1 + ((y * y) / (z * z))),           fy * x * y / (z * z),   fy * x / z;
                     Ji << gradx, grady;
                     
                     jacobian.row(jac_row_id) = Ji * Jw;
 
                     // Deproject to second sensor plane
-                    warped_x = (fx * x1 / z1) + cx, warped_y = (fy * y1 / z1) + cy;
+                    warped_x = (fx * x / z) + cx, warped_y = (fy * y / z) + cy;
 
                     // Interpolate value for I2
                     interpolated_intensity = vo::util::interpolate2dlinear(warped_x, warped_y, gray_image);
