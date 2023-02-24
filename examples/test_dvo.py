@@ -162,7 +162,7 @@ def _load_tum_benchmark(data_path: Path, size: int = None):
             # If groundtruth then save SE(3) pose
             if filename == "groundtruth.txt":
                 pose = np.eye(4, dtype=np.float32)
-                pose[:3,:3] = quaternion_to_rotmat(np.array(line_stripped[4:], dtype=np.float32))
+                pose[:3,:3] = quaternion_to_rotmat(np.roll(np.array(line_stripped[4:], dtype=np.float32), 1))
                 pose[:3, 3] = np.asarray(line_stripped[1:4], dtype=np.float32)
                 data.append(pose)
 
@@ -252,7 +252,6 @@ def main():
 
     visualize = additional_info.pop("visualize")
 
-    accumulated_transform = gt_transforms[0]
     gt_transforms_tum_fmt = []
     transforms = []
     poses = []
@@ -263,7 +262,10 @@ def main():
         transform = dvo.step(rgb_image, depth_image, np.eye(4, dtype=np.float32))
         e = time()
 
-        accumulated_transform = accumulated_transform @ inverse(transform)
+        if i == 0:
+            accumulated_transform = gt_transform
+        else:
+            accumulated_transform = accumulated_transform @ inverse(transform)
 
         # logger.info("Pose: {} Gt:{}".format(accumulated_transform[:3, 3].tolist(), gt_transform))
 
@@ -278,19 +280,19 @@ def main():
         # Store pose in TUM dataset format 'tx ty tz qx qy qz qw'
         pose_tum_fmt = np.empty(7, dtype=np.float32)
         pose_tum_fmt[:3] = accumulated_transform[:3, 3]
-        pose_tum_fmt[3:] = rotmat_to_quaternion(accumulated_transform[:3, :3])
+        pose_tum_fmt[3:] = np.roll(rotmat_to_quaternion(accumulated_transform[:3, :3]), 1)
         poses.append(pose_tum_fmt.tolist())
 
         # Store relative transform in TUM dataset format 'tx ty tz qx qy qz qw'
         transform_tum_fmt = np.empty(7, dtype=np.float32)
         transform_tum_fmt[:3] = transform[:3, 3]
-        transform_tum_fmt[3:] = rotmat_to_quaternion(transform[:3, :3])
+        transform_tum_fmt[3:] = np.roll(rotmat_to_quaternion(transform[:3, :3]), 1)
         transforms.append(transform_tum_fmt.tolist())
 
         # Store ground truth transform in TUM dataset format 'tx ty tz qx qy qz qw'
         gt_tum_fmt = np.empty(7, dtype=np.float32)
         gt_tum_fmt[:3] = gt_transform[:3, 3]
-        gt_tum_fmt[3:] = rotmat_to_quaternion(gt_transform[:3, :3])
+        gt_tum_fmt[3:] = np.roll(rotmat_to_quaternion(gt_transform[:3, :3]), 1)
         gt_transforms_tum_fmt.append(gt_tum_fmt.tolist())
 
         # Store translational error
@@ -308,7 +310,7 @@ def main():
     output_file = Path(__file__).resolve().parent / "report.json"
 
     with output_file.open("w") as fp:
-        json.dump(report, fp, indent=3)
+        json.dump(report, fp, indent=2)
 
     logger.info("Dumped report at '{}'".format(str(output_file)))
 

@@ -32,7 +32,8 @@ namespace vo {
             public:
 
                 BaseDenseVisualOdometry(
-                    int levels, bool use_gpu, bool use_weighter, float sigma, int max_iterations, float tolerance
+                    int levels, bool use_gpu, bool use_weighter, float sigma = -1.0f, int max_iterations = 100,
+                    float tolerance = 1e-5
                 );
                 virtual ~BaseDenseVisualOdometry();
 

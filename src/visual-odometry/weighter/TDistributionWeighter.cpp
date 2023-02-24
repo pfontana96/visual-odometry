@@ -39,8 +39,7 @@ namespace vo {
 
         float TDistributionWeighter::compute_scale_(const cv::Mat& residuals, const float last_lambda) {
             
-            float sigma_squared = 0.0f, residual_squared_i, residual_i;
-            int count = 0;
+            float sigma_squared = 0.0f, residual_squared_i, residual_i, count = 0.0f;
             for (int y = 0; y < residuals.rows; y++) {
                 for (int x = 0; x < residuals.cols; x++) {
 
@@ -49,14 +48,14 @@ namespace vo {
                     if (std::isfinite(residual_i)) {
                         residual_squared_i = residual_i * residual_i;
                         sigma_squared += (
-                            residual_squared_i * (((float) dof_ + 1) / ((float) dof_ + residual_squared_i * last_lambda))
+                            residual_squared_i * (((float) dof_ + 1.0f) / ((float) dof_ + residual_squared_i * last_lambda))
                         );
-                        count ++;
+                        count += 1.0f;
                     }
                 }
             }
 
-            return sigma_squared / ((float) count);
+            return (sigma_squared / count)  ;
         }
 
         float TDistributionWeighter::compute_weights_(cv::Mat& residuals, cv::Mat& weights_out, const float lambda) {
@@ -68,9 +67,7 @@ namespace vo {
 
                     if (std::isfinite(residual_i)) {
                         residual_squared_i = residual_i * residual_i;
-                        weights_out.at<float>(y, x) = (
-                            residual_squared_i * (((float) dof_ + 1) / ((float) dof_ + residual_squared_i * lambda))
-                        );
+                        weights_out.at<float>(y, x) = ((float) dof_ + 1.0f) / ((float) dof_ + residual_squared_i * lambda);
 
                         error += weights_out.at<float>(y, x) * residual_squared_i;
 

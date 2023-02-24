@@ -87,7 +87,7 @@ namespace vo {
                              0.0f, fy / z1, - fy * y1 / (z1*z1), - fy * (1 + ((y1 * y1) / (z1 * z1))),           fy * x1 * y1 / (z1 * z1),   fy * x1 / z1;
                     Ji << gradx, grady;
                     
-                    jacobian.row(jac_row_id) << Ji * Jw;
+                    jacobian.row(jac_row_id) = Ji * Jw;
 
                     // Deproject to second sensor plane
                     warped_x = (fx * x1 / z1) + cx, warped_y = (fy * y1 / z1) + cy;
