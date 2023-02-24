@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.0.2)
 project(vo)
 
 ## Compile as C++17
-add_compile_options(-std=c++17)
+add_compile_options(-std=c++17 -funsafe-math-optimizations)
 # Enable fastmath
 # add_compile_options(-ffast-math)
 if(NOT CMAKE_BUILD_TYPE)

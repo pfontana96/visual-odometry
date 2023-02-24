@@ -54,6 +54,15 @@ namespace vo {
                     depth_scale_ = new_depth_scale;
                 }
 
+                /**
+                 * @brief Resets estimation in case required from an external source
+                 * (e.g. SLAM backend)
+                 * 
+                 */
+                inline void reset() {
+                    first_frame_ = true;
+                };
+
             private:
                 // Attributes
                 vo::util::RGBDImagePyramid last_rgbd_pyramid_, current_rgbd_pyramid_;
@@ -80,6 +89,17 @@ namespace vo {
                 inline void update_last_pyramid() {
                     last_rgbd_pyramid_.update(current_rgbd_pyramid_);
                 }
+
+                // https://stats.stackexchange.com/questions/93316/parameter-uncertainty-after-non-linear-least-squares-estimation
+                inline vo::util::Vec6f estimate_covariance_(
+                    const Eigen::Ref<const vo::util::Mat6f> hessian, float error, int nb_observations
+                ) {
+                    vo::util::Mat6f covariance = hessian.inverse();
+                    covariance *= error / ((float) (nb_observations - 6));
+
+                    return covariance.diagonal();
+                }
+
         };
     } // namespace core
 } // namespace vo

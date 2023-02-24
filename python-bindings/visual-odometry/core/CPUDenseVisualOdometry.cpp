@@ -33,5 +33,9 @@ void init_cpu_dense_visual_odometry_submodule(py::module &core) {
             "update_camera_info", &vo::core::CPUDenseVisualOdometry::update_camera_info,
             "Updates camera intrinsics as well as height and width", py::arg("camera_intrinsics"),
             py::arg("height"), py::arg("width"), py::arg("depth_scale")
+        )
+        .def(
+            "reset", &vo::core::CPUDenseVisualOdometry::reset,
+            "Resets estimation in case required from an external source (e.g. SLAM backend)"
         );
 }

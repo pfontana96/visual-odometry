@@ -95,6 +95,8 @@ namespace vo {
 
             float count, error, error_diff;
 
+            std::string out_message;
+
             for (size_t it = 0; it < (size_t) max_iterations_; it++) {
 
                 count = compute_residuals_and_jacobian_(
@@ -105,12 +107,10 @@ namespace vo {
 
                 // Solve Normal equations
                 error = weighter_->weight(residuals_image, weights_image);
-                error /= (float) count;
+                // error /= (float) count;
 
                 H = jacobian.transpose() * weights.asDiagonal() * jacobian;
                 b = - (jacobian.transpose() * residuals.cwiseProduct(weights));
-                // H = jacobian.transpose().cwiseProduct(weights) * jacobian;
-                // b = -jacobian.transpose() * residuals.cwiseProduct(weights);
 
                 if (sigma_ > 0.0f) {
                     H += ((1 / sigma_) * vo::util::Mat6f::Identity());
@@ -130,20 +130,22 @@ namespace vo {
                         old = increment.inverse() * old;
                     }
 
-                    if (abs(error_diff) <= tolerance_) {
-                        std::cout << "Found convergence at iteration '" << it
-                        << "' (error: " << error << ")" << std::endl;
-                        break;
+                    // https://en.wikipedia.org/wiki/Non-linear_least_squares#Convergence_criteria
+                    if (abs(error_diff / error_prev) < tolerance_){
+                            out_message = "Iteration '" + std::to_string(it + 1) + "' (error: " +
+                            std::to_string(error) + ") -> Found convergence";
+                            break;
                     }
 
                 } else {
-                    std::cout << "Error '" << error << "' increased at iteration '" << it << "'" << std::endl;
+                    out_message = "Iteration '" + std::to_string(it + 1) + "' (error: " +
+                    std::to_string(error) + ") -> Error increased";
                     break;
                 }
 
-                if (it == ((size_t) max_iterations_ - 1)) {
-                    std::cout << "Exceeded maximum number of iterations '" << max_iterations_ << "'" << std::endl;
-                }
+                if (it == ((size_t) max_iterations_ - 1))
+                    out_message = "Iteration '" + std::to_string(it + 1) + "' (error: " + std::to_string(error) +
+                    ") -> Exceeded maximum number of iterations";
 
                 error_prev = error;
             }
@@ -151,6 +153,10 @@ namespace vo {
             delete weighter_;
 
             estimate = xi.matrix();
+
+            vo::util::Vec6f cov = estimate_covariance_(H, error, count);
+
+            std::cout << out_message << std::endl;
 
         }
     } // core
