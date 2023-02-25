@@ -3,6 +3,8 @@
 
 #include <cmath>
 
+#include <eigen3/Eigen/Core>
+
 #include <core/BaseDenseVisualOdometry.h>
 #include <utils/interpolate.h>
 #include <utils/YAMLLoader.h>
