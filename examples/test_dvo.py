@@ -19,7 +19,7 @@ from pyvo.utils import quaternion_to_rotmat, rotmat_to_quaternion, inverse
 STDOUT_FORMAT = "%(asctime)s %(name)-4s %(levelname)-4s %(funcName)-8s %(message)s"
 
 
-_SUPPORTED_BENCHMARKS = ["tum-fr1"]
+_SUPPORTED_BENCHMARKS = ["tum-fr1", "test"]
 
 
 logger = logging.getLogger(__name__)
@@ -84,30 +84,34 @@ def load_camera(filepath: str):
         width = data["width"]
 
     except KeyError as e:
-        raise ValueError("Invalid intrinsics camera file, does not contain '{}' entry")
+        raise ValueError("Invalid intrinsics camera file, does not contain '{}' entry".format(e))
 
     return camera_intrinsics, depth_scale, height, width
 
 
-def load_benchmark(type: str, data_dir: str = None, size: int = None, pyr_down: bool = False):
+def load_benchmark(type: str, data_dir: str, size: int = None):
+
+    data_dir = Path(data_dir).resolve()
+
+    if not data_dir.is_dir():
+        raise FileNotFoundError("Could not find data dir at '{}'".format(str(data_dir)))
+
     if type == "tum-fr1":
-        if data_dir is None:
-            raise ValueError("When running 'tum-fr1' path to data (-d) should be specified")
-
-        data_dir = Path(data_dir).resolve()
-
-        if not data_dir.is_dir():
-            raise FileNotFoundError("Could not find data dir at '{}'".format(str(data_dir)))
-
-        # Try to get camera intrinsics on dataset directory, if not default to the test one:
-        camera_intrinsics_file = data_dir / "camera_intrinsics.yaml"
-        if not camera_intrinsics_file.exists():
-            logger.warning("No camera intrinsics file for dataset at '{}', defaulting to test one..".format(str(data_dir)))
-            camera_intrinsics_file = Path(__file__).resolve().parent.parent / "tests/test_data/camera_intrinsics.yaml"
 
         gt_transforms, rgb_images, depth_images, additional_info = _load_tum_benchmark(
             data_path=data_dir, size=size
         )
+    
+    elif type == "test":
+        if data_dir is None:
+            raise ValueError("When running 'test' path to data (-d) should be specified")
+
+        data_dir = Path(data_dir).resolve()
+
+        rgb_images, depth_images, additional_info = _load_test_benchmark(
+            data_path=data_dir, size=size
+        )
+        gt_transforms = [None] * len(rgb_images)
 
     return gt_transforms, rgb_images, depth_images, additional_info
 
@@ -231,24 +235,78 @@ def _load_tum_benchmark(data_path: Path, size: int = None):
     return gt_transforms, rgb_images, depth_images, additional_info
 
 
+def _load_test_benchmark(data_path: Path, size: int = None):
+    """Loads test benchmark (custom dataset format)
+
+    Parameters
+    ----------
+    data_path : Path, optional
+        Path to where the data is located, by default None. If None, then the testing dataset is loaded
+
+    Returns
+    -------
+    List[np.ndarray] :
+        List of RGB images.
+    List[np.ndarray] :
+        List of depth images.
+    dict :
+        Dictionary containing info about where the loaded images are stored on the filesystem.
+    """
+
+    with (data_path / "ground_truth.json").open("r") as fp:
+        data = json.load(fp)
+
+    rgb_images = []
+    depth_images = []
+    additional_info = {"rgb": [], "depth": [], "camera_intrinsics": str(data_path / "camera_intrinsics.yaml")}
+    for i, value in enumerate(data.values()):
+
+        rgb_image = cv2.cvtColor(cv2.imread(str(data_path / value["rgb"]), cv2.IMREAD_ANYCOLOR), cv2.COLOR_BGR2RGB)
+        depth_image = cv2.imread(str(data_path / value["depth"]), cv2.IMREAD_ANYDEPTH)
+
+        rgb_images.append(rgb_image)
+        depth_images.append(depth_image)
+
+        additional_info["type"] = "TEST"
+        additional_info["rgb"].append(str(data_path / value["rgb"]))
+        additional_info["depth"].append(str(data_path / value["depth"]))
+
+        if size is not None:
+            if i >= (size - 1):
+                logger.info("Using first '{}' data samples".format(size))
+                break
+
+    return rgb_images, depth_images, additional_info
+
+
 def visualize_trajectory(estimated_poses: np.ndarray, ground_truth_poses: np.ndarray):
 
     # Load Np array with positions (Nx3)
+    gt_available = True
     poses = np.empty((len(estimated_poses), 3), dtype=np.float32)
     gt_poses = np.empty((len(estimated_poses), 3), dtype=np.float32)
     for i, (pose, gt_pose) in enumerate(zip(estimated_poses, ground_truth_poses)):
         poses[i, :] = np.array(pose[:3], dtype=np.float32)
-        gt_poses[i, :] = np.array(gt_pose[:3], dtype=np.float32)
+        
+        if (gt_pose is not None) and (gt_available):
+            gt_poses[i, :] = np.array(gt_pose[:3], dtype=np.float32)
+        
+        else:
+            gt_available = False
 
     ax = plt.subplot(projection="3d")
     ax.plot(poses[:, 0], poses[:, 1], poses[:, 2])
-    ax.plot(gt_poses[:, 0], gt_poses[:, 1], gt_poses[:, 2], color="red")
+
+    if gt_available:
+        ax.plot(gt_poses[:, 0], gt_poses[:, 1], gt_poses[:, 2], color="red")
 
     plt.show()
 
 def main():
 
     dvo, gt_transforms, rgb_images, depth_images, additional_info = parse_arguments()
+
+    gt_available = gt_transforms[0] is not None
 
     visualize = additional_info.pop("visualize")
 
@@ -263,7 +321,13 @@ def main():
         e = time()
 
         if i == 0:
-            accumulated_transform = gt_transform
+
+            if gt_available:
+                accumulated_transform = gt_transform
+
+            else:
+                accumulated_transform = np.eye(4, dtype=np.float32)
+
         else:
             accumulated_transform = accumulated_transform @ inverse(transform)
 
@@ -271,6 +335,7 @@ def main():
         if gt_transform is not None:
             t_error = float(np.linalg.norm(accumulated_transform[:3, 3] - gt_transform[:3, 3]))
             logger.info("[Frame {} ({:.3f} s)] | Translational error: {:.4f} m ".format(i + 1, e - s, t_error))
+
         else:
             t_error = "N/A"
             logger.info("[Frame {} ({:.3f} s)]".format(i + 1, e - s))
@@ -278,20 +343,24 @@ def main():
         # Store pose in TUM dataset format 'tx ty tz qx qy qz qw'
         pose_tum_fmt = np.empty(7, dtype=np.float32)
         pose_tum_fmt[:3] = accumulated_transform[:3, 3]
-        pose_tum_fmt[3:] = np.roll(rotmat_to_quaternion(accumulated_transform[:3, :3]), 1)
+        pose_tum_fmt[3:] = np.roll(rotmat_to_quaternion(accumulated_transform[:3, :3]), -1)
         poses.append(pose_tum_fmt.tolist())
 
         # Store relative transform in TUM dataset format 'tx ty tz qx qy qz qw'
         transform_tum_fmt = np.empty(7, dtype=np.float32)
         transform_tum_fmt[:3] = transform[:3, 3]
-        transform_tum_fmt[3:] = np.roll(rotmat_to_quaternion(transform[:3, :3]), 1)
+        transform_tum_fmt[3:] = np.roll(rotmat_to_quaternion(transform[:3, :3]), -1)
         transforms.append(transform_tum_fmt.tolist())
 
-        # Store ground truth transform in TUM dataset format 'tx ty tz qx qy qz qw'
-        gt_tum_fmt = np.empty(7, dtype=np.float32)
-        gt_tum_fmt[:3] = gt_transform[:3, 3]
-        gt_tum_fmt[3:] = np.roll(rotmat_to_quaternion(gt_transform[:3, :3]), 1)
-        gt_transforms_tum_fmt.append(gt_tum_fmt.tolist())
+        # If available store ground truth transform in TUM dataset format 'tx ty tz qx qy qz qw'
+        if gt_available:
+            gt_tum_fmt = np.empty(7, dtype=np.float32)
+            gt_tum_fmt[:3] = gt_transform[:3, 3]
+            gt_tum_fmt[3:] = np.roll(rotmat_to_quaternion(gt_transform[:3, :3]), -1)
+            gt_transforms_tum_fmt.append(gt_tum_fmt.tolist())
+
+        else:
+            gt_transforms_tum_fmt.append(None)
 
         # Store translational error
         errors.append(t_error)
@@ -300,9 +369,12 @@ def main():
     report = {
         "estimated_poses": poses,
         "estimated_transforms": transforms,
-        "ground_truth_transforms": gt_transforms_tum_fmt,
         "errors": errors
     }
+
+    if gt_available:
+        report.update({"ground_truth_transforms": gt_transforms_tum_fmt})
+
     report.update(additional_info)
 
     output_file = Path(__file__).resolve().parent / "report.json"
