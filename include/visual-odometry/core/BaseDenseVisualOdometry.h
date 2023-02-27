@@ -7,6 +7,7 @@
 #include <string>
 #include <exception>
 #include <iostream>
+#include <memory>
 // #include <filesystem>
 
 #include <opencv2/core.hpp>
@@ -75,6 +76,8 @@ namespace vo {
                 float depth_scale_;
 
                 vo::util::Mat4f last_estimate_;
+
+                std::shared_ptr<vo::weighter::BaseWeighter> weighter_;
 
                 // Methods
                 void non_linear_least_squares_(Eigen::Ref<vo::util::Mat4f> xi, int level);

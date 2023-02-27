@@ -15,7 +15,15 @@ namespace vo {
             current_rgbd_pyramid_(levels),
             first_frame_(true),
             no_camera_info_(true)
-        {}
+        {
+            if (use_weighter_){
+                weighter_ = std::make_shared<vo::weighter::TDistributionWeighter>(5, 5.0, 0.001, 50);
+                std::cout << "Using T-Distribution weighter" << std::endl;
+            } else {
+                weighter_ = std::make_shared<vo::weighter::UniformWeighter>();
+                std::cout << "Not using weighter" << std::endl;
+            }
+        }
 
         BaseDenseVisualOdometry::~BaseDenseVisualOdometry(){};
 
@@ -80,13 +88,6 @@ namespace vo {
                 weights_image.ptr<float>(), cv_size.height * cv_size.width
             );
 
-            vo::weighter::BaseWeighter *weighter_;
-            if (use_weighter_){
-                weighter_ = new vo::weighter::TDistributionWeighter(5, 5.0, 0.001, 50);
-            } else {
-                weighter_ = new vo::weighter::UniformWeighter();
-            }
-
             vo::util::MatX6f jacobian(cv_size.height * cv_size.width, 6);
             vo::util::Vec6f solution, b;
             vo::util::Mat6f H;
@@ -149,8 +150,6 @@ namespace vo {
 
                 error_prev = error;
             }
-
-            delete weighter_;
 
             estimate = xi.matrix();
 
