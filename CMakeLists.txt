@@ -87,7 +87,8 @@ target_link_libraries(
 )
 
 # Python bindings
-find_package(pybind11 CONFIG REQUIRED)
+# find_package(pybind11 CONFIG REQUIRED PATHS ${CMAKE_SOURCE_DIR}/extern/pybind11/include)a
+add_subdirectory(extern/pybind11)
 
 execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import numpy; print(numpy.get_include())" OUTPUT_VARIABLE NUMPY_INCLUDE OUTPUT_STRIP_TRAILING_WHITESPACE)
 message(STATUS "NUMPY_INCLUDE: " ${NUMPY_INCLUDE})

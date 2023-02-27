@@ -4,7 +4,6 @@ import logging
 from time import time
 from argparse import ArgumentParser
 
-from matplotlib import pyplot as plt
 import yaml
 
 import numpy as np
@@ -280,6 +279,8 @@ def _load_test_benchmark(data_path: Path, size: int = None):
 
 
 def visualize_trajectory(estimated_poses: np.ndarray, ground_truth_poses: np.ndarray):
+
+    from matplotlib import pyplot as plt
 
     # Load Np array with positions (Nx3)
     gt_available = True
