@@ -15,7 +15,15 @@ namespace vo {
             current_rgbd_pyramid_(levels),
             first_frame_(true),
             no_camera_info_(true)
-        {}
+        {
+            if (use_weighter_){
+                weighter_ = std::make_shared<vo::weighter::TDistributionWeighter>(5, 5.0, 0.001, 50);
+                std::cout << "Using T-Distribution weighter" << std::endl;
+            } else {
+                weighter_ = std::make_shared<vo::weighter::UniformWeighter>();
+                std::cout << "Not using weighter" << std::endl;
+            }
+        }
 
         BaseDenseVisualOdometry::~BaseDenseVisualOdometry(){};
 
@@ -80,13 +88,6 @@ namespace vo {
                 weights_image.ptr<float>(), cv_size.height * cv_size.width
             );
 
-            vo::weighter::BaseWeighter *weighter_;
-            if (use_weighter_){
-                weighter_ = new vo::weighter::TDistributionWeighter(5, 5.0, 0.001, 50);
-            } else {
-                weighter_ = new vo::weighter::UniformWeighter();
-            }
-
             vo::util::MatX6f jacobian(cv_size.height * cv_size.width, 6);
             vo::util::Vec6f solution, b;
             vo::util::Mat6f H;
@@ -94,6 +95,8 @@ namespace vo {
             Sophus::SE3f increment, old(last_estimate_), xi(estimate);
 
             float count, error, error_diff;
+
+            std::string out_message;
 
             for (size_t it = 0; it < (size_t) max_iterations_; it++) {
 
@@ -105,12 +108,10 @@ namespace vo {
 
                 // Solve Normal equations
                 error = weighter_->weight(residuals_image, weights_image);
-                error /= (float) count;
+                // error /= (float) count;
 
                 H = jacobian.transpose() * weights.asDiagonal() * jacobian;
                 b = - (jacobian.transpose() * residuals.cwiseProduct(weights));
-                // H = jacobian.transpose().cwiseProduct(weights) * jacobian;
-                // b = -jacobian.transpose() * residuals.cwiseProduct(weights);
 
                 if (sigma_ > 0.0f) {
                     H += ((1 / sigma_) * vo::util::Mat6f::Identity());
@@ -130,27 +131,31 @@ namespace vo {
                         old = increment.inverse() * old;
                     }
 
-                    if (abs(error_diff) <= tolerance_) {
-                        std::cout << "Found convergence at iteration '" << it
-                        << "' (error: " << error << ")" << std::endl;
-                        break;
+                    // https://en.wikipedia.org/wiki/Non-linear_least_squares#Convergence_criteria
+                    if (abs(error_diff / error_prev) < tolerance_){
+                            out_message = "Iteration '" + std::to_string(it + 1) + "' (error: " +
+                            std::to_string(error) + ") -> Found convergence";
+                            break;
                     }
 
                 } else {
-                    std::cout << "Error '" << error << "' increased at iteration '" << it << "'" << std::endl;
+                    out_message = "Iteration '" + std::to_string(it + 1) + "' (error: " +
+                    std::to_string(error) + ") -> Error increased";
                     break;
                 }
 
-                if (it == ((size_t) max_iterations_ - 1)) {
-                    std::cout << "Exceeded maximum number of iterations '" << max_iterations_ << "'" << std::endl;
-                }
+                if (it == ((size_t) max_iterations_ - 1))
+                    out_message = "Iteration '" + std::to_string(it + 1) + "' (error: " + std::to_string(error) +
+                    ") -> Exceeded maximum number of iterations";
 
                 error_prev = error;
             }
 
-            delete weighter_;
-
             estimate = xi.matrix();
+
+            vo::util::Vec6f cov = estimate_covariance_(H, error, count);
+
+            std::cout << out_message << std::endl;
 
         }
     } // core
