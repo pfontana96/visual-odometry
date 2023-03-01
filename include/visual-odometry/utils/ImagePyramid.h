@@ -15,9 +15,11 @@
 
 #include <utils/types.h>
 
+
 namespace vo {
     namespace util {
 
+        // methods
         template<typename T>
         static void pyrDownMedianSmooth(const cv::Mat& in, cv::Mat& out)
         {
@@ -36,18 +38,26 @@ namespace vo {
             }
         };
 
-        class RGBDImagePyramid {
+        // BaseRGBDImagePyramid
+        class BaseRGBDImagePyramid {
             public:
-                // Methods
-                RGBDImagePyramid(const int levels);
-                ~RGBDImagePyramid();
+                BaseRGBDImagePyramid(int levels);
+                virtual ~BaseRGBDImagePyramid();
 
-                void build_pyramids(
+                virtual void build_pyramids(
                     const cv::Mat& gray_image, const cv::Mat& depth_image,
                     const Eigen::Ref<const vo::util::Mat3f> intrinsics
-                );
+                ) = 0;
 
-                inline cv::Mat gray_at(int level) {
+                inline void update(const vo::util::BaseRGBDImagePyramid& other) {
+
+                    cv::Mat gray = other.gray_at(0).clone(), depth = other.depth_at(0).clone();
+                    vo::util::Mat3f intrinsics = other.intrinsics_at(0);
+
+                    build_pyramids(gray, depth, intrinsics);
+                };
+
+                inline cv::Mat gray_at(int level) const {
                     assert((
                         ("Got incorrect 'level': " + std::to_string(level) + " for pyramid with " + std::to_string(levels_) + " levels"),
                         (level>=0) && (level<levels_)
@@ -55,9 +65,9 @@ namespace vo {
                     assert(("Cannot query empty pyramid", empty_ != true));
 
                     return gray_pyramid_[level];
-                }
+                };
 
-                inline cv::Mat depth_at(int level) {
+                inline cv::Mat depth_at(int level) const {
                     assert((
                         ("Got incorrect 'level': " + std::to_string(level) + " for pyramid with " + std::to_string(levels_) + " levels"),
                         (level>=0) && (level<levels_)
@@ -65,9 +75,9 @@ namespace vo {
                     assert(("Cannot query empty pyramid", empty_ != true));
 
                     return depth_pyramid_[level];
-                }
+                };
 
-                inline vo::util::Mat3f& intrinsics_at(int level) {
+                inline vo::util::Mat3f intrinsics_at(int level) const {
                     assert((
                         ("Got incorrect 'level': " + std::to_string(level) + " for pyramid with " + std::to_string(levels_) + " levels"),
                         (level>=0) && (level<levels_)
@@ -75,26 +85,30 @@ namespace vo {
                     assert(("Cannot query empty pyramid", empty_ != true));
 
                     return intrinsics_[level];
-                }
+                };
 
-                inline bool empty() {
+                inline bool empty() const {
                     return empty_;
                 }
 
-                inline void update(vo::util::RGBDImagePyramid& other) {
-
-                    cv::Mat gray = other.gray_at(0).clone(), depth = other.depth_at(0).clone();
-                    vo::util::Mat3f intrinsics = other.intrinsics_at(0);
-
-                    build_pyramids(gray, depth, intrinsics);
-                }
-
-            private:
+            protected:
                 // Attributes
                 bool empty_;
                 int levels_;
                 std::vector<cv::Mat> gray_pyramid_, depth_pyramid_;
-                std::vector<vo::util::Mat3f> intrinsics_;                
+                std::vector<vo::util::Mat3f> intrinsics_;
+        };
+
+        class RGBDImagePyramid : public BaseRGBDImagePyramid {
+            public:
+                // Methods
+                RGBDImagePyramid(int levels);
+                ~RGBDImagePyramid();
+
+                void build_pyramids(
+                    const cv::Mat& gray_image, const cv::Mat& depth_image,
+                    const Eigen::Ref<const vo::util::Mat3f> intrinsics
+                ) override;
         };
     }  // namespace utils
 } // namespace vo

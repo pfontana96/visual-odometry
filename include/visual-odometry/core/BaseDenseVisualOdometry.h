@@ -66,7 +66,7 @@ namespace vo {
 
             private:
                 // Attributes
-                vo::util::RGBDImagePyramid last_rgbd_pyramid_, current_rgbd_pyramid_;
+                std::shared_ptr<vo::util::RGBDImagePyramid> last_rgbd_pyramid_, current_rgbd_pyramid_;
 
                 int levels_, max_iterations_, height_, width_;
                 float tolerance_, sigma_;
@@ -90,7 +90,7 @@ namespace vo {
                 ) = 0;
 
                 inline void update_last_pyramid() {
-                    last_rgbd_pyramid_.update(current_rgbd_pyramid_);
+                    last_rgbd_pyramid_->update(*current_rgbd_pyramid_);
                 }
 
                 // https://stats.stackexchange.com/questions/93316/parameter-uncertainty-after-non-linear-least-squares-estimation

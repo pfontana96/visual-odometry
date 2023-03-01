@@ -2,9 +2,8 @@ cmake_minimum_required(VERSION 3.0.2)
 project(vo)
 
 ## Compile as C++17
-add_compile_options(-std=c++17)
-# Enable fastmath
-# add_compile_options(-ffast-math)
+set(CMAKE_CXX_STANDARD 17)
+
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
@@ -33,37 +32,53 @@ if(OpenMP_FOUND)
 endif(OpenMP_FOUND)
 
 # Enable CUDA
-option(USE_GPU "Option to build for GPU support" OFF)
+# option(USE_GPU "Option to build for GPU support" OFF)
 if (USE_GPU)
   message(STATUS "USE_GPU set to true")
-  find_package(CUDA)
+  find_package(CUDA REQUIRED)
   if(CUDA_FOUND)
     enable_language(CUDA)
 
     if(CMAKE_CUDA_COMPILER)
-      set(CMAKE_CUDA_FLAGS "-arch=sm_53")
+      set(CMAKE_CUDA_FLAGS "-arch=sm_53 -O3")
       set(CUDA_VERBOSE_BUILD on )
+      set(CMAKE_CUDA_STANDARD 14)
     endif(CMAKE_CUDA_COMPILER)
 
   else()
     message(WARNING "Could not find CUDA")
 
   endif(CUDA_FOUND)
+else()
+  message(STATUS "USE_GPU not set")
 endif(USE_GPU)
 
 # VO Library
-file(GLOB_RECURSE VO_SRC_FILES "${CMAKE_CURRENT_LIST_DIR}/src/visual-odometry/*.cpp")
+file(GLOB_RECURSE VO_SRC_FILES_RAW "${CMAKE_CURRENT_LIST_DIR}/src/visual-odometry/*.cpp")
+foreach( FILE ${VO_SRC_FILES_RAW})
+  if (${FILE} MATCHES GPU.cpp$)
+    if (USE_GPU)
+      list(APPEND VO_SRC_FILES ${FILE})
+    endif()
+  else()
+    list(APPEND VO_SRC_FILES ${FILE})
+  endif()
+endforeach()
 
-if(CMAKE_CUDA_COMPILER)
+if(USE_GPU)
   file(GLOB_RECURSE VO_GPU_SRC_FILES "${CMAKE_CURRENT_LIST_DIR}/src/visual-odometry/*.cu")
   set(VO_SRC_FILES ${VO_SRC_FILES} ${VO_GPU_SRC_FILES})
-endif(CMAKE_CUDA_COMPILER)
+endif(USE_GPU)
 
 set(VO_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include/visual-odometry)
 
 add_library(vo SHARED
   ${VO_SRC_FILES}
 )
+
+if(USE_GPU)
+  target_compile_definitions(vo PRIVATE VO_CUDA_ENABLED)
+endif(USE_GPU)
 
 target_include_directories( vo PUBLIC 
   ${VO_INCLUDE_DIR}
@@ -72,10 +87,10 @@ target_include_directories( vo PUBLIC
   ${YAML_CPP_INCLUDE_DIRS}
 )
 
-if(CMAKE_CUDA_COMPILER)
+if(USE_GPU)
   set_target_properties(vo PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   set_target_properties(vo PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-endif(CMAKE_CUDA_COMPILER)
+endif(USE_GPU)
 
 target_link_libraries(
   vo
@@ -86,33 +101,35 @@ target_link_libraries(
     # $<$<BOOL:${OpenMP_FOUND}>:OpenMP::OpenMP_CXX>
 )
 
-# Python bindings
-# find_package(pybind11 CONFIG REQUIRED PATHS ${CMAKE_SOURCE_DIR}/extern/pybind11/include)a
+# Python bindings (PyVO)
 add_subdirectory(extern/pybind11)
 
 execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import numpy; print(numpy.get_include())" OUTPUT_VARIABLE NUMPY_INCLUDE OUTPUT_STRIP_TRAILING_WHITESPACE)
 message(STATUS "NUMPY_INCLUDE: " ${NUMPY_INCLUDE})
 include_directories(${NUMPY_INCLUDE})
 
-file(GLOB_RECURSE PYVO_SRC_FILES "${CMAKE_CURRENT_LIST_DIR}/python-bindings/*.cpp")
+file(GLOB_RECURSE PYVO_SRC_FILES_RAW "${CMAKE_CURRENT_LIST_DIR}/python-bindings/*.cpp")
+foreach( FILE ${PYVO_SRC_FILES_RAW})
+  if (${FILE} MATCHES GPU.cpp$)
+    if (USE_GPU)
+      list(APPEND PYVO_SRC_FILES ${FILE})
+    endif(USE_GPU)
+  else()
+    list(APPEND PYVO_SRC_FILES ${FILE})
+  endif()
+endforeach()
+
 pybind11_add_module(pyvo MODULE ${PYVO_SRC_FILES})
 
 target_link_libraries(pyvo PRIVATE
   vo
   ${OpenCV_LIBRARIES}
 )
-# target_compile_definitions(pyvo PRIVATE
-#   "ndarray_converter.h"
-# )
-# install(TARGETS _pyvo DESTINATION pyvo)
 
-# add_library(pyvo SHARED
-#   ${VO_SRC_FILES}
-# )
+if(USE_GPU)
+  target_compile_definitions(pyvo PRIVATE PYVO_CUDA_ENABLED)
+endif()
 
-# target_link_libraries(pyvo
-#   vo
-# )
 
 # Testing
 # option(BUILD_TESTS "Option for building tests" OFF)

@@ -3,7 +3,8 @@
 namespace vo {
     namespace util {
 
-        RGBDImagePyramid::RGBDImagePyramid(const int levels):
+        // BaseRGBDImagePyramid
+        BaseRGBDImagePyramid::BaseRGBDImagePyramid(int levels):
             empty_(true),
             levels_(levels)
         {
@@ -16,6 +17,13 @@ namespace vo {
             depth_pyramid_.reserve(levels_);
             intrinsics_.reserve(levels_);
         }
+
+        BaseRGBDImagePyramid::~BaseRGBDImagePyramid(){};
+
+        // RGBDImagePyramid
+        RGBDImagePyramid::RGBDImagePyramid(int levels):
+            BaseRGBDImagePyramid(levels)
+        {}
 
         RGBDImagePyramid::~RGBDImagePyramid() {}
 

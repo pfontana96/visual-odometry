@@ -11,8 +11,6 @@ namespace vo {
             sigma_(sigma),
             tolerance_(tolerance),
             max_iterations_(max_iterations),
-            last_rgbd_pyramid_(levels),
-            current_rgbd_pyramid_(levels),
             first_frame_(true),
             no_camera_info_(true)
         {
@@ -22,6 +20,13 @@ namespace vo {
             } else {
                 weighter_ = std::make_shared<vo::weighter::UniformWeighter>();
                 std::cout << "Not using weighter" << std::endl;
+            }
+
+            if (use_gpu_){
+
+            } else {
+                last_rgbd_pyramid_ = std::make_shared<vo::util::RGBDImagePyramid>(levels_);
+                current_rgbd_pyramid_ = std::make_shared<vo::util::RGBDImagePyramid>(levels_);
             }
         }
 
@@ -45,7 +50,7 @@ namespace vo {
 
             if (first_frame_ == true) {
 
-                last_rgbd_pyramid_.build_pyramids(
+                last_rgbd_pyramid_->build_pyramids(
                     gray_image, depth_image, intrinsics_
                 );
 
@@ -56,7 +61,7 @@ namespace vo {
                 return transform;
             }
 
-            current_rgbd_pyramid_.build_pyramids(
+            current_rgbd_pyramid_->build_pyramids(
                 gray_image, depth_image, intrinsics_
             );
 
@@ -77,7 +82,7 @@ namespace vo {
 
             float error_prev = std::numeric_limits<float>::max();
 
-            cv::Size cv_size = current_rgbd_pyramid_.gray_at(level).size();
+            cv::Size cv_size = current_rgbd_pyramid_->gray_at(level).size();
             cv::Mat residuals_image(cv_size.height, cv_size.width, CV_32F);
             Eigen::Map<vo::util::VecXf> residuals(
                 residuals_image.ptr<float>(), cv_size.height * cv_size.width
@@ -101,8 +106,8 @@ namespace vo {
             for (size_t it = 0; it < (size_t) max_iterations_; it++) {
 
                 count = compute_residuals_and_jacobian_(
-                    current_rgbd_pyramid_.gray_at(level), last_rgbd_pyramid_.gray_at(level),
-                    last_rgbd_pyramid_.depth_at(level), xi.matrix(), last_rgbd_pyramid_.intrinsics_at(level),
+                    current_rgbd_pyramid_->gray_at(level), last_rgbd_pyramid_->gray_at(level),
+                    last_rgbd_pyramid_->depth_at(level), xi.matrix(), last_rgbd_pyramid_->intrinsics_at(level),
                     depth_scale_, residuals_image, jacobian
                 );
 
