@@ -24,6 +24,10 @@
 #include <weighter/TDistributionWeighter.h>
 #include <weighter/UniformWeighter.h>
 
+#ifdef VO_CUDA_ENABLED
+    #include <utils/ImagePyramidGPU.h>
+#endif
+
 
 namespace vo {
     namespace core {
@@ -66,7 +70,7 @@ namespace vo {
 
             private:
                 // Attributes
-                std::shared_ptr<vo::util::RGBDImagePyramid> last_rgbd_pyramid_, current_rgbd_pyramid_;
+                std::shared_ptr<vo::util::BaseRGBDImagePyramid> last_rgbd_pyramid_, current_rgbd_pyramid_;
 
                 int levels_, max_iterations_, height_, width_;
                 float tolerance_, sigma_;

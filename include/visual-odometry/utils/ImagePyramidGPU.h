@@ -4,15 +4,10 @@
 #include <vector>
 #include <cassert>
 #include <iostream>
-#include <cmath>
 #include <exception>
 #include <memory>
 #include <type_traits>
-#include <cmath>  // std functions are not allowed on device functions but cuda provides overloaded math functions
 
-#ifdef VO_CUDA_ENABLED
-    #include <cuda/common.cuh>
-#endif
 #include <cuda/common.cuh>
 
 #include <opencv4/opencv2/core.hpp>

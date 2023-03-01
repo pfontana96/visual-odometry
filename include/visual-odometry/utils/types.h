@@ -23,33 +23,6 @@ namespace vo {
 
         static const float nan = std::numeric_limits<float>::quiet_NaN();
 
-        template<typename T>
-        class Revertable {
-            public:
-                Revertable(const T& value) : value(value)
-                {
-                }
-
-                inline const T& operator()() const
-                {
-                    return value;
-                }
-
-                T& update()
-                {
-                    old = value;
-
-                    return value;
-                }
-
-                void revert()
-                {
-                    value = old;
-                }
-            private:
-                T old, value;
-        };
-
     } // namespace util
 }  // namespace vo
 

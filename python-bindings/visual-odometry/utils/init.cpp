@@ -7,8 +7,16 @@ namespace py = pybind11;
 void init_image_pyramid(py::module &);
 void init_conversions(py::module &);
 
+#ifdef PYVO_CUDA_ENABLED
+    void init_image_pyramid_gpu(py::module &);
+#endif
+
 void init_utils_submodule(py::module &m) {
     py::module utils = m.def_submodule("utils");
     init_image_pyramid(utils);
     init_conversions(utils);
+
+    #ifdef PYVO_CUDA_ENABLED
+        init_image_pyramid_gpu(utils);
+    #endif
 }

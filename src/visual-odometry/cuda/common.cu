@@ -5,11 +5,11 @@
 namespace vo {
     namespace cuda {
 
-        void handle_cuda_error(cudaError_t err, const char* file, int line)
+        void handle_cuda_error(int err, const char* file, int line)
         {
             if(err != cudaSuccess)
             {
-                printf("%s in %s at line %d\n", cudaGetErrorString(err), file, line);
+                printf("%s in %s at line %d\n", cudaGetErrorString((cudaError_t) err), file, line);
                 exit(EXIT_FAILURE);
             }
         };

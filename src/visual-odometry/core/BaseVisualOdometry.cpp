@@ -23,6 +23,14 @@ namespace vo {
             }
 
             if (use_gpu_){
+                #ifndef VO_CUDA_ENABLED
+                    throw std::invalid_argument("'use_gpu' set to true but vo was not compiled with CUDA support.")
+                #endif
+            }
+
+            if (use_gpu_) {
+                last_rgbd_pyramid_ = std::make_shared<vo::util::RGBDImagePyramidGPU>(levels_);
+                current_rgbd_pyramid_ = std::make_shared<vo::util::RGBDImagePyramidGPU>(levels_);
 
             } else {
                 last_rgbd_pyramid_ = std::make_shared<vo::util::RGBDImagePyramid>(levels_);

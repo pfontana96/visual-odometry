@@ -4,12 +4,17 @@
 #include <stdio.h>
 #include <stdint.h>
 #include <iostream>
+#include <math.h>
 
 #define HANDLE_CUDA_ERROR(err) {vo::cuda::handle_cuda_error(err, __FILE__, __LINE__);}
 #define CUDA_BLOCKSIZE 16
 
 namespace vo {
     namespace cuda {
+
+        static const float nan = FP_NAN;
+
+        void handle_cuda_error(int err, const char* file, int line);
 
         void cuda_malloc_wrapper(void **devPtr, size_t size);
         void cuda_memcpy_to_device_wrapper(void *dst, const void *src, size_t count);
