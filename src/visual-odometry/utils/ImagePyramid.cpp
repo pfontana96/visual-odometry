@@ -3,8 +3,9 @@
 namespace vo {
     namespace util {
 
-        RGBDImagePyramid::RGBDImagePyramid(const int levels):
+        RGBDImagePyramid::RGBDImagePyramid(int levels, bool use_gpu):
             empty_(true),
+            use_gpu_(use_gpu),
             levels_(levels)
         {
             assert((levels > 0) || ([levels] {

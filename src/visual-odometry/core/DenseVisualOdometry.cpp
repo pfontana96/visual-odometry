@@ -5,8 +5,8 @@ namespace vo {
         DenseVisualOdometry::DenseVisualOdometry(
             int levels, bool use_gpu, bool use_weighter, float sigma, int max_iterations, float tolerance
         ):
-            last_rgbd_pyramid_(levels),
-            current_rgbd_pyramid_(levels),
+            last_rgbd_pyramid_(levels, use_gpu),
+            current_rgbd_pyramid_(levels, use_gpu),
             levels_(levels),
             max_iterations_(max_iterations),
             tolerance_(tolerance),
@@ -59,7 +59,8 @@ namespace vo {
         vo::util::Mat4f DenseVisualOdometry::step(
             const cv::Mat& color_image, const cv::Mat &depth_image, const Eigen::Ref<const vo::util::Mat4f> init_guess
         ) {
-            assert ((no_camera_info_ == false) && "No camera info set. Cannot do a step");
+            if(no_camera_info_)
+                throw std::runtime_error("Camera info not set, cannot do a step.");
 
             cv::Mat gray_image;
             cv::cvtColor(color_image, gray_image, cv::COLOR_BGR2GRAY);

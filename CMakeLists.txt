@@ -2,8 +2,9 @@ cmake_minimum_required(VERSION 3.0.2)
 project(vo)
 
 ## Compile as C++17
-add_compile_options(-std=c++17)
-# Enable fastmath
+# add_compile_options(-std=c++17)
+set(CMAKE_CXX_STANDARD 17)
+
 # add_compile_options(-ffast-math)
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
@@ -33,10 +34,10 @@ if (USE_OMP)
 endif(USE_OMP)
 
 # Enable CUDA
-# option(USE_GPU "Option to build for GPU support" OFF)
 if (USE_GPU)
-  message(STATUS "USE_GPU set to true")
+  message(STATUS "Compiling with GPU support (CUDA)")
   find_package(CUDA REQUIRED)
+  if(CUDA_FOUND)
     enable_language(CUDA)
 
     if(CMAKE_CUDA_COMPILER)
@@ -68,6 +69,7 @@ target_include_directories( vo PUBLIC
 )
 
 if(USE_GPU)
+  target_compile_definitions(vo PRIVATE VO_CUDA_ENABLED)
   set_target_properties(vo PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   set_target_properties(vo PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 endif(USE_GPU)
@@ -101,4 +103,15 @@ if(BUILD_PYTHON)
     vo
     ${OpenCV_LIBRARIES}
   )
+
+  if(USE_GPU)
+    target_compile_definitions(pyvo PRIVATE PYVO_CUDA_ENABLED)
+  endif(USE_GPU)
+
+  target_link_libraries(pyvo PRIVATE
+    vo
+    ${OpenCV_LIBRARIES}
+  )
+
 endif(BUILD_PYTHON)
+

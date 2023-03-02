@@ -5,7 +5,7 @@
 #include <cassert>
 #include <limits>
 #include <string>
-#include <exception>
+#include <stdexcept>
 #include <iostream>
 #include <memory>
 // #include <filesystem>
