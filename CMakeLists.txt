@@ -36,8 +36,7 @@ endif(OpenMP_FOUND)
 # option(USE_GPU "Option to build for GPU support" OFF)
 if (USE_GPU)
   message(STATUS "USE_GPU set to true")
-  find_package(CUDA)
-  if(CUDA_FOUND)
+  find_package(CUDA REQUIRED)
     enable_language(CUDA)
 
     if(CMAKE_CUDA_COMPILER)
@@ -45,19 +44,15 @@ if (USE_GPU)
       set(CUDA_VERBOSE_BUILD on )
     endif(CMAKE_CUDA_COMPILER)
 
-  else()
-    message(WARNING "Could not find CUDA")
-
-  endif(CUDA_FOUND)
 endif(USE_GPU)
 
 # VO Library
 file(GLOB_RECURSE VO_SRC_FILES "${CMAKE_CURRENT_LIST_DIR}/src/visual-odometry/*.cpp")
 
-if(CMAKE_CUDA_COMPILER)
+if(USE_GPU)
   file(GLOB_RECURSE VO_GPU_SRC_FILES "${CMAKE_CURRENT_LIST_DIR}/src/visual-odometry/*.cu")
   set(VO_SRC_FILES ${VO_SRC_FILES} ${VO_GPU_SRC_FILES})
-endif(CMAKE_CUDA_COMPILER)
+endif(USE_GPU)
 
 set(VO_INCLUDE_DIR ${CMAKE_CURRENT_LIST_DIR}/include/visual-odometry)
 
@@ -72,10 +67,10 @@ target_include_directories( vo PUBLIC
   ${YAML_CPP_INCLUDE_DIRS}
 )
 
-if(CMAKE_CUDA_COMPILER)
+if(USE_GPU)
   set_target_properties(vo PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   set_target_properties(vo PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-endif(CMAKE_CUDA_COMPILER)
+endif(USE_GPU)
 
 target_link_libraries(
   vo
@@ -87,17 +82,19 @@ target_link_libraries(
 )
 
 # Python bindings
-# find_package(pybind11 CONFIG REQUIRED PATHS ${CMAKE_SOURCE_DIR}/extern/pybind11/include)a
-add_subdirectory(extern/pybind11)
+if(BUILD_PYTHON)
+  message("Building Python Bindings")
+  add_subdirectory(extern/pybind11)
 
-execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import numpy; print(numpy.get_include())" OUTPUT_VARIABLE NUMPY_INCLUDE OUTPUT_STRIP_TRAILING_WHITESPACE)
-message(STATUS "NUMPY_INCLUDE: " ${NUMPY_INCLUDE})
-include_directories(${NUMPY_INCLUDE})
+  execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import numpy; print(numpy.get_include())" OUTPUT_VARIABLE NUMPY_INCLUDE OUTPUT_STRIP_TRAILING_WHITESPACE)
+  message(STATUS "NUMPY_INCLUDE: " ${NUMPY_INCLUDE})
+  include_directories(${NUMPY_INCLUDE})
 
-file(GLOB_RECURSE PYVO_SRC_FILES "${CMAKE_CURRENT_LIST_DIR}/python-bindings/*.cpp")
-pybind11_add_module(pyvo MODULE ${PYVO_SRC_FILES})
+  file(GLOB_RECURSE PYVO_SRC_FILES "${CMAKE_CURRENT_LIST_DIR}/python-bindings/*.cpp")
+  pybind11_add_module(pyvo MODULE ${PYVO_SRC_FILES})
 
-target_link_libraries(pyvo PRIVATE
-  vo
-  ${OpenCV_LIBRARIES}
-)
+  target_link_libraries(pyvo PRIVATE
+    vo
+    ${OpenCV_LIBRARIES}
+  )
+endif(BUILD_PYTHON)
