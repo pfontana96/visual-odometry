@@ -7,13 +7,12 @@ namespace vo {
         TDistributionWeighter::TDistributionWeighter(
             const int dof, const float initial_sigma, const float tolerance, const int max_iterations
         ):
-            dof_(dof),
+            max_iterations_(max_iterations),
             initial_sigma_(initial_sigma),
+            initial_lambda_(1.0f / (initial_sigma * initial_sigma)),
             tolerance_(tolerance),
-            max_iterations_(max_iterations)
-        {
-            initial_lambda_ = 1.0f / (initial_sigma_ * initial_sigma_);
-        }
+            dof_(dof)
+        {}
 
         TDistributionWeighter::~TDistributionWeighter(){}
 
@@ -59,7 +58,7 @@ namespace vo {
         }
 
         float TDistributionWeighter::compute_weights_(cv::Mat& residuals, cv::Mat& weights_out, const float lambda) {
-            float residual_squared_i, residual_i, error;
+            float residual_squared_i, residual_i, error = 0.0f;
             for (int y = 0; y < residuals.rows; y++) {
                 for (int x = 0; x < residuals.cols; x++) {
 
