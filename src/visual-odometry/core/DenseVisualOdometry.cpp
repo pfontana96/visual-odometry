@@ -5,14 +5,14 @@ namespace vo {
         DenseVisualOdometry::DenseVisualOdometry(
             int levels, bool use_gpu, bool use_weighter, float sigma, int max_iterations, float tolerance
         ):
-            levels_(levels),
-            use_gpu_(use_gpu),
-            use_weighter_(use_weighter),
-            sigma_(sigma),
-            tolerance_(tolerance),
-            max_iterations_(max_iterations),
             last_rgbd_pyramid_(levels),
             current_rgbd_pyramid_(levels),
+            levels_(levels),
+            max_iterations_(max_iterations),
+            tolerance_(tolerance),
+            sigma_(sigma),
+            use_gpu_(use_gpu),
+            use_weighter_(use_weighter),
             first_frame_(true),
             no_camera_info_(true)
         {
@@ -174,7 +174,7 @@ namespace vo {
 
             estimate = xi.matrix();
 
-            vo::util::Vec6f cov = estimate_covariance_(H, error, count);
+            // vo::util::Vec6f cov = estimate_covariance_(H, error, count);
 
             std::cout << out_message << std::endl;
 
@@ -195,9 +195,8 @@ namespace vo {
             Eigen::Matrix<float, 2, 6, Eigen::RowMajor> Jw;
             Eigen::Matrix<float, 1, 2> Ji;
 
-            // #pragma omp parallel for private(Jw, Ji) shared(count)
-            for (size_t v = 0; v < gray_image.rows; v++) {
-                for (size_t u = 0; u < gray_image.cols; u++) {
+            for (int v = 0; v < gray_image.rows; v++) {
+                for (int u = 0; u < gray_image.cols; u++) {
 
                     int jac_row_id = (int) u + (int) v * gray_image.cols;
 
