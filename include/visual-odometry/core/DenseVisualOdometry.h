@@ -19,6 +19,8 @@
 
 #include <utils/types.h>
 #include <utils/ImagePyramid.h>
+#include <utils/interpolate.h>
+#include <utils/YAMLLoader.h>
 
 #include <weighter/BaseWeighter.h>
 #include <weighter/TDistributionWeighter.h>
@@ -28,15 +30,17 @@
 namespace vo {
     namespace core {
 
-        class BaseDenseVisualOdometry {
+        class DenseVisualOdometry {
 
             public:
 
-                BaseDenseVisualOdometry(
+                DenseVisualOdometry(
                     int levels, bool use_gpu, bool use_weighter, float sigma = -1.0f, int max_iterations = 100,
                     float tolerance = 1e-5
                 );
-                virtual ~BaseDenseVisualOdometry();
+                ~DenseVisualOdometry();
+
+                static vo::core::DenseVisualOdometry load_from_yaml(const std::string filename);
 
                 vo::util::Mat4f step(
                     const cv::Mat& color_image, const cv::Mat &depth_image,
@@ -80,14 +84,30 @@ namespace vo {
                 std::shared_ptr<vo::weighter::BaseWeighter> weighter_;
 
                 // Methods
+                template<typename T>
+                static inline float compute_gradient_(const cv::Mat& image, int x, int y, bool x_direction) {
+                    
+                    T prev_value, next_value;
+
+                    if (x_direction == true) {
+                        prev_value = image.at<T>(y, std::max<int>(x - 1, 0));
+                        next_value = image.at<T>(y, std::min<int>(x + 1, image.cols - 1));
+                    } else {
+                        prev_value = image.at<T>(std::max<int>(y - 1, 0), x);
+                        next_value = image.at<T>(std::min<int>(y + 1, image.rows - 1), x);
+                    }
+
+                    return 0.5f * ((float) (next_value - prev_value));
+                };
+
                 void non_linear_least_squares_(Eigen::Ref<vo::util::Mat4f> xi, int level);
 
-                virtual int compute_residuals_and_jacobian_(
+                int compute_residuals_and_jacobian_(
                     const cv::Mat& gray_image, const cv::Mat& gray_image_prev,
                     const cv::Mat& depth_image_prev, const Eigen::Ref<const vo::util::Mat4f> transform,
                     const Eigen::Ref<const vo::util::Mat3f> intrinsics, float depth_scale,
                     cv::Mat& residuals_out, Eigen::Ref<vo::util::MatX6f> jacobian
-                ) = 0;
+                );
 
                 inline void update_last_pyramid() {
                     last_rgbd_pyramid_.update(current_rgbd_pyramid_);

@@ -11,7 +11,7 @@ import cv2
 from scipy.spatial.distance import cdist
 from tqdm import tqdm
 
-from pyvo.core.cpu_dense_visual_odometry import CPUDenseVisualOdometry
+from pyvo.core import DenseVisualOdometry
 from pyvo.utils import quaternion_to_rotmat, rotmat_to_quaternion, inverse
 
 
@@ -58,7 +58,7 @@ def parse_arguments():
 
     cam_intrinsics, depth_scale, height, width = load_camera(args.intrinsics_file)
 
-    dvo = CPUDenseVisualOdometry.load_from_yaml(args.config_file)
+    dvo = DenseVisualOdometry.load_from_yaml(args.config_file)
     dvo.update_camera_info(cam_intrinsics, height, width, depth_scale)
 
     additional_info.update({"visualize": args.visualize})
