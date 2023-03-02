@@ -33,7 +33,7 @@ if(OpenMP_FOUND)
 endif(OpenMP_FOUND)
 
 # Enable CUDA
-option(USE_GPU "Option to build for GPU support" OFF)
+# option(USE_GPU "Option to build for GPU support" OFF)
 if (USE_GPU)
   message(STATUS "USE_GPU set to true")
   find_package(CUDA)
@@ -87,7 +87,8 @@ target_link_libraries(
 )
 
 # Python bindings
-find_package(pybind11 CONFIG REQUIRED)
+# find_package(pybind11 CONFIG REQUIRED PATHS ${CMAKE_SOURCE_DIR}/extern/pybind11/include)a
+add_subdirectory(extern/pybind11)
 
 execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import numpy; print(numpy.get_include())" OUTPUT_VARIABLE NUMPY_INCLUDE OUTPUT_STRIP_TRAILING_WHITESPACE)
 message(STATUS "NUMPY_INCLUDE: " ${NUMPY_INCLUDE})
@@ -100,41 +101,3 @@ target_link_libraries(pyvo PRIVATE
   vo
   ${OpenCV_LIBRARIES}
 )
-# target_compile_definitions(pyvo PRIVATE
-#   "ndarray_converter.h"
-# )
-# install(TARGETS _pyvo DESTINATION pyvo)
-
-# add_library(pyvo SHARED
-#   ${VO_SRC_FILES}
-# )
-
-# target_link_libraries(pyvo
-#   vo
-# )
-
-# Testing
-# option(BUILD_TESTS "Option for building tests" OFF)
-# if (BUILD_TESTS)
-#   message(STATUS "Tests set to True")
-#   include(FetchContent)
-#   FetchContent_Declare(
-#     googletest
-#     URL https://github.com/google/googletest/archive/03597a01ee50ed33e9dfd640b249b4be3799d395.zip
-#   )
-#   FetchContent_MakeAvailable(googletest)
-
-#   enable_testing()
-#   file(GLOB_RECURSE VO_TESTS_FILES "${CMAKE_CURRENT_LIST_DIR}/tests/vo/*.cpp")
-
-#   add_executable(vo_tests ${VO_TESTS_FILES})
-
-#   target_link_libraries(
-#     vo_tests
-#     GTest::gtest_main
-#     vo
-#   )
-
-#   include(GoogleTest)
-#   gtest_discover_tests(vo_tests)
-# endif(BUILD_TESTS)

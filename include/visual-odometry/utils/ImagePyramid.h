@@ -8,7 +8,7 @@
 #include <cassert>
 #include <iostream>
 #include <cmath>
-#include <exception>
+#include <stdexcept>
 
 #include <opencv4/opencv2/core.hpp>
 #include <opencv2/imgproc.hpp>
@@ -48,31 +48,40 @@ namespace vo {
                 );
 
                 inline cv::Mat gray_at(int level) {
-                    assert((
-                        ("Got incorrect 'level': " + std::to_string(level) + " for pyramid with " + std::to_string(levels_) + " levels"),
-                        (level>=0) && (level<levels_)
-                    ));
-                    assert(("Cannot query empty pyramid", empty_ != true));
+                    if (level < 0 || level >= levels_)
+                        throw std::invalid_argument(
+                            "Expected 'level' to be greater than 0 and less than '" + std::to_string(levels_) +
+                            "', got '" + std::to_string(level) + "' instead."
+                        );
+
+                    if (empty_)
+                        throw std::runtime_error("Cannot query empty pyramid");
 
                     return gray_pyramid_[level];
                 }
 
                 inline cv::Mat depth_at(int level) {
-                    assert((
-                        ("Got incorrect 'level': " + std::to_string(level) + " for pyramid with " + std::to_string(levels_) + " levels"),
-                        (level>=0) && (level<levels_)
-                    ));
-                    assert(("Cannot query empty pyramid", empty_ != true));
+                    if (level < 0 || level >= levels_)
+                        throw std::invalid_argument(
+                            "Expected 'level' to be greater than 0 and less than '" + std::to_string(levels_) +
+                            "', got '" + std::to_string(level) + "' instead."
+                        );
+
+                    if (empty_)
+                        throw std::runtime_error("Cannot query empty pyramid");
 
                     return depth_pyramid_[level];
                 }
 
                 inline vo::util::Mat3f& intrinsics_at(int level) {
-                    assert((
-                        ("Got incorrect 'level': " + std::to_string(level) + " for pyramid with " + std::to_string(levels_) + " levels"),
-                        (level>=0) && (level<levels_)
-                    ));
-                    assert(("Cannot query empty pyramid", empty_ != true));
+                    if (level < 0 || level >= levels_)
+                        throw std::invalid_argument(
+                            "Expected 'level' to be greater than 0 and less than '" + std::to_string(levels_) +
+                            "', got '" + std::to_string(level) + "' instead."
+                        );
+
+                    if (empty_)
+                        throw std::runtime_error("Cannot query empty pyramid");
 
                     return intrinsics_[level];
                 }

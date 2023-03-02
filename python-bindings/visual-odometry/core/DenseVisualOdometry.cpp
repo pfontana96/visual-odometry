@@ -1,6 +1,6 @@
 #include <opencv2/core.hpp>
 
-#include <core/CPUDenseVisualOdometry.h>
+#include <core/DenseVisualOdometry.h>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
@@ -10,11 +10,9 @@
 
 namespace py = pybind11;
 
-void init_cpu_dense_visual_odometry_submodule(py::module &core) {
+void init_dense_visual_odometry_submodule(py::module &core) {
 
-    py::module cpu_dense_visual_odometry = core.def_submodule("cpu_dense_visual_odometry");
-
-    py::class_<vo::core::CPUDenseVisualOdometry>(cpu_dense_visual_odometry, "CPUDenseVisualOdometry")
+    py::class_<vo::core::DenseVisualOdometry>(core, "DenseVisualOdometry")
         .def(
             py::init<const int, const bool, const bool, const float, const int, const float>(),
             "Initializes Dense Visual Odometry",
@@ -22,20 +20,20 @@ void init_cpu_dense_visual_odometry_submodule(py::module &core) {
             py::arg("sigma"), py::arg("max_iterations"), py::arg("tolerance")
         )
         .def_static(
-            "load_from_yaml", &vo::core::CPUDenseVisualOdometry::load_from_yaml,
+            "load_from_yaml", &vo::core::DenseVisualOdometry::load_from_yaml,
             "Loads from YAML config file", py::arg("filename")
         )
         .def(
-            "step", &vo::core::CPUDenseVisualOdometry::step,
+            "step", &vo::core::DenseVisualOdometry::step,
             "Performs a step", py::arg("color_image"), py::arg("depth_image"), py::arg("init_guess")
         )
         .def(
-            "update_camera_info", &vo::core::CPUDenseVisualOdometry::update_camera_info,
+            "update_camera_info", &vo::core::DenseVisualOdometry::update_camera_info,
             "Updates camera intrinsics as well as height and width", py::arg("camera_intrinsics"),
             py::arg("height"), py::arg("width"), py::arg("depth_scale")
         )
         .def(
-            "reset", &vo::core::CPUDenseVisualOdometry::reset,
+            "reset", &vo::core::DenseVisualOdometry::reset,
             "Resets estimation in case required from an external source (e.g. SLAM backend)"
         );
 }
