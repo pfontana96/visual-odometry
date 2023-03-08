@@ -1,6 +1,7 @@
 #include <opencv2/core.hpp>
 
 #include <core/DenseVisualOdometry.h>
+#include <utils/types.h>
 
 #include <pybind11/pybind11.h>
 #include <pybind11/eigen.h>
@@ -9,6 +10,9 @@
 #include "../ndarray_converter.h"
 
 namespace py = pybind11;
+
+template <typename... Args>
+using overload_cast_ = py::detail::overload_cast_impl<Args...>;
 
 void init_dense_visual_odometry_submodule(py::module &core) {
 
@@ -28,9 +32,18 @@ void init_dense_visual_odometry_submodule(py::module &core) {
             "Performs a step", py::arg("color_image"), py::arg("depth_image"), py::arg("init_guess")
         )
         .def(
-            "update_camera_info", &vo::core::DenseVisualOdometry::update_camera_info,
-            "Updates camera intrinsics as well as height and width", py::arg("camera_intrinsics"),
-            py::arg("height"), py::arg("width"), py::arg("depth_scale")
+            "update_camera_info", overload_cast_<const Eigen::Ref<const vo::util::Mat3f>, int, int, float>()(
+                &vo::core::DenseVisualOdometry::update_camera_info
+            ),
+            "Updates camera intrinsics as well as height and width",
+            py::arg("camera_intrinsics"), py::arg("height"), py::arg("width"), py::arg("depth_scale")
+        )
+        .def(
+            "update_camera_info", overload_cast_<const std::string>()(
+                &vo::core::DenseVisualOdometry::update_camera_info
+            ),
+            "Updates camera intrinsics as well as height and width",
+            py::arg("intrinsics_file")
         )
         .def(
             "reset", &vo::core::DenseVisualOdometry::reset,
