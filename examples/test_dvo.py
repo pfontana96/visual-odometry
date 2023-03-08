@@ -4,8 +4,6 @@ import logging
 from time import time
 from argparse import ArgumentParser
 
-import yaml
-
 import numpy as np
 import cv2
 from scipy.spatial.distance import cdist
@@ -56,37 +54,12 @@ def parse_arguments():
         type=args.benchmark, data_dir=args.data_dir, size=args.size
     )
 
-    cam_intrinsics, depth_scale, height, width = load_camera(args.intrinsics_file)
-
     dvo = DenseVisualOdometry.load_from_yaml(args.config_file)
-    dvo.update_camera_info(cam_intrinsics, height, width, depth_scale)
+    dvo.update_camera_info(args.intrinsics_file)
 
     additional_info.update({"visualize": args.visualize})
 
     return dvo, gt_transforms, rgb_images, depth_images, additional_info
-
-
-def load_camera(filepath: str):
-    camera_intrinsics_file = Path(filepath).resolve()
-    if not camera_intrinsics_file.exists():
-        raise FileNotFoundError("Could not find camera intrinsics at '{}'".format(
-            str(camera_intrinsics_file)
-        ))
-
-    with camera_intrinsics_file.open("r") as fp:
-            data = yaml.load(fp, yaml.Loader)
-
-    try:
-        camera_intrinsics = np.array(data["intrinsics"], dtype=np.float32)
-        depth_scale = data["depth_scale"]
-        height = data["height"]
-        width = data["width"]
-
-    except KeyError as e:
-        raise ValueError("Invalid intrinsics camera file, does not contain '{}' entry".format(e))
-
-    return camera_intrinsics, depth_scale, height, width
-
 
 def load_benchmark(type: str, data_dir: str, size: int = None):
 
