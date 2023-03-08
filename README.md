@@ -4,6 +4,11 @@ Library for performing RGB-D Visual Odometry
 Currently supported approaches: 
 - Robust Dense Visual Odometry [1]
 
+This project contain some external modules as git submodules, so after clonning the repository one must run:
+```bash
+git submodule update --init --recursive
+```
+
 ## C++ build
 To buld the library `vo`, on project's root dir run these commands
 ```bash
