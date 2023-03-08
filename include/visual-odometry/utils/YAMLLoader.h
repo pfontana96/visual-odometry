@@ -2,10 +2,7 @@
 #define VO_UTIL_YAML_LOADER
 
 #include <string>
-#include <map>
-#include <exception>
-#include <typeinfo>
-#include <type_traits>
+#include <stdexcept>
 
 #include <yaml-cpp/yaml.h>
 
