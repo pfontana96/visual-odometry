@@ -59,6 +59,19 @@ namespace vo {
                     depth_scale_ = new_depth_scale;
                 }
 
+                inline void update_camera_info(
+                    const std::string new_camera_intrinsics_filename
+                ) {
+                    vo::util::YAMLLoader loader(new_camera_intrinsics_filename);
+
+                    int new_height = loader.get_value<int>("height");
+                    int new_width = loader.get_value<int>("width");
+                    vo::util::Mat3f new_camera_intrinsics = loader.get_value<vo::util::Mat3f>("intrinsics");
+                    float new_depth_scale = loader.get_value<float>("depth_scale");
+
+                    update_camera_info(new_camera_intrinsics, new_height, new_width, new_depth_scale);
+                }
+
                 /**
                  * @brief Resets estimation in case required from an external source
                  * (e.g. SLAM backend)

@@ -2,11 +2,11 @@
 #define VO_UTIL_YAML_LOADER
 
 #include <string>
-#include <map>
-#include <exception>
-#include <typeinfo>
+#include <stdexcept>
 
 #include <yaml-cpp/yaml.h>
+
+#include <utils/types.h>
 
 
 namespace vo {
@@ -23,6 +23,8 @@ namespace vo {
             private:
                 YAML::Node config_;
         };
+
+        template<> vo::util::Mat3f YAMLLoader::get_value<vo::util::Mat3f>(const std::string key);
 
         template<typename T>
         T YAMLLoader::get_value(const std::string key) {
