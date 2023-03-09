@@ -18,10 +18,10 @@ void init_dense_visual_odometry_submodule(py::module &core) {
 
     py::class_<vo::core::DenseVisualOdometry>(core, "DenseVisualOdometry")
         .def(
-            py::init<const int, const bool, const bool, const float, const int, const float>(),
+            py::init<const int, const bool, const float, const int, const float>(),
             "Initializes Dense Visual Odometry",
-            py::arg("levels"), py::arg("use_gpu"), py::arg("use_weighter"),
-            py::arg("sigma"), py::arg("max_iterations"), py::arg("tolerance")
+            py::arg("levels"), py::arg("use_weighter"), py::arg("sigma"),
+            py::arg("max_iterations"), py::arg("tolerance")
         )
         .def_static(
             "load_from_yaml", &vo::core::DenseVisualOdometry::load_from_yaml,

@@ -27,65 +27,40 @@ namespace vo {
         void query_devices();
 
         template<typename T>
-        class CudaArray{
-            public:
-                CudaArray(int height, int width):
-                    size_(((size_t) (width * height)) * sizeof(T))
-                {
-                    vo::cuda::cuda_malloc_wrapper((void**) &raw_gpu_pointer_, size_);
-                };
+        T* cuda_pointer_creator(int size, bool managed_memory) {
+            T* ptr = new T(size);
 
-                ~CudaArray() {
-                    vo::cuda::cuda_free_wrapper(raw_gpu_pointer_);
-                }
+            if (managed_memory) {
+                vo::cuda::cuda_malloc_managed_wrapper((void**) &ptr, size * sizeof(T));
 
-                T* get() const {
-                    return raw_gpu_pointer_;
-                };
+            } else {
+                vo::cuda::cuda_malloc_wrapper((void**) &ptr, size * sizeof(T));
+            }
 
-                void copyFromHost(const T* host_ptr) {
-                    vo::cuda::cuda_memcpy_to_device_wrapper((void*) raw_gpu_pointer_, (void*) host_ptr, size_);
-                }
-
-                void copyToHost(T* host_ptr){
-                    vo::cuda::cuda_memcpy_to_host_wrapper((void*) host_ptr, (void*) raw_gpu_pointer_, size_);
-                }
-
-                inline int size(){
-                    return size_;
-                };
-
-            private:
-                size_t size_;
-                T* raw_gpu_pointer_, raw_pointer_;
+            return ptr;
         };
 
         template<typename T>
-        class CudaSharedArray{
-            public:
+        void cuda_pointer_deleter(T* ptr) {
+            vo::cuda::cuda_free_wrapper(ptr);
+        };
 
-                CudaSharedArray(int height, int width):
-                    size_(width * height * sizeof(T))
-                {
-                    vo::cuda::cuda_malloc_managed_wrapper((void**) &raw_pointer_, size_);
-                };
+        template<typename T>
+        struct CudaArray : public std::enable_shared_from_this<vo::cuda::CudaArray<T>> {
 
-                ~CudaSharedArray() {
-                    vo::cuda::cuda_free_wrapper(raw_pointer_);
-                };
+            int size;
+            bool managed_memory;
+            std::shared_ptr<T> pointer;
 
-                T* get() const {
-                    return raw_pointer_;
-                };
+            CudaArray(int height, int width, bool managed_memory = false):
+                size(width * height * sizeof(T)),
+                managed_memory(managed_memory),
+                pointer(
+                    vo::cuda::cuda_pointer_creator<T>(height * width, managed_memory),
+                    vo::cuda::cuda_pointer_deleter<T>
+                )
+            {};
 
-                inline int size(){
-                    return size_;
-                };
-
-            private:
-
-                int size_;
-                T* raw_pointer_;
         };
     }
 }

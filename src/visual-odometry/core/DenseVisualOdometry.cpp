@@ -3,7 +3,7 @@
 namespace vo {
     namespace core {
         DenseVisualOdometry::DenseVisualOdometry(
-            int levels, bool use_gpu, bool use_weighter, float sigma, int max_iterations, float tolerance
+            int levels, bool use_weighter, float sigma, int max_iterations, float tolerance
         ):
             last_rgbd_pyramid_(levels),
             current_rgbd_pyramid_(levels),
@@ -11,7 +11,6 @@ namespace vo {
             max_iterations_(max_iterations),
             tolerance_(tolerance),
             sigma_(sigma),
-            use_gpu_(use_gpu),
             use_weighter_(use_weighter),
             first_frame_(true),
             no_camera_info_(true)
@@ -39,13 +38,12 @@ namespace vo {
 
             // Load necessary parameters from YAML file
             int levels = loader.get_value<int>("levels");
-            bool use_gpu = loader.get_value<bool>("use_gpu");
             bool use_weighter = loader.get_value<bool>("use_weighter");
             float sigma = loader.get_value<float>("sigma");
             int max_iterations = loader.get_value<int>("max_iterations");
             float tolerance = loader.get_value<float>("tolerance");
 
-            return vo::core::DenseVisualOdometry(levels, use_gpu, use_weighter, sigma, max_iterations, tolerance);
+            return vo::core::DenseVisualOdometry(levels, use_weighter, sigma, max_iterations, tolerance);
         }
 
         /**
@@ -101,31 +99,16 @@ namespace vo {
             float error_prev = std::numeric_limits<float>::max();
 
             cv::Size cv_size = current_rgbd_pyramid_.gray_at(level).size();
-            #ifndef VO_CUDA_ENABLED
             cv::Mat residuals_image(cv_size.height, cv_size.width, CV_32F);
             Eigen::Map<vo::util::VecXf> residuals(
                 residuals_image.ptr<float>(), cv_size.height * cv_size.width
             );
-            #else
-            std::cout << "start" << std::endl; 
-            vo::cuda::CudaSharedArray<float> residuals_gpu(cv_size.height, cv_size.width);
-            cv::Mat residuals_image(cv_size.height, cv_size.width, CV_32F, residuals_gpu.get());
-            Eigen::Map<vo::util::VecXf> residuals(
-                residuals_image.ptr<float>(), cv_size.height * cv_size.width
-            );
-            std::cout << "cpt 1" << std::endl;
-            #endif
 
             cv::Mat weights_image(cv_size.height, cv_size.width, CV_32F);
             Eigen::Map<vo::util::VecXf> weights(
                 weights_image.ptr<float>(), cv_size.height * cv_size.width
             );
 
-            #ifdef VO_CUDA_ENABLED
-            vo::cuda::CudaArray<float> jacobian_gpu(cv_size.height * cv_size.width, 6);
-            vo::cuda::CudaArray<float> transform_gpu(4, 4);
-            std::cout << "cpt 2" << std::endl;
-            #endif
             vo::util::MatX6f jacobian(cv_size.height * cv_size.width, 6);
             vo::util::Vec6f solution, b;
             vo::util::Mat6f H;
@@ -138,28 +121,11 @@ namespace vo {
 
             for (size_t it = 0; it < (size_t) max_iterations_; it++) {
 
-                #ifndef VO_CUDA_ENABLED
                 count = compute_residuals_and_jacobian_(
                     current_rgbd_pyramid_.gray_at(level), last_rgbd_pyramid_.gray_at(level),
                     last_rgbd_pyramid_.depth_at(level), xi.matrix(), last_rgbd_pyramid_.intrinsics_at(level),
                     depth_scale_, residuals_image, jacobian
                 );
-                #else
-                std::cout << "cpt 3" << std::endl;
-                transform_gpu.copyFromHost(xi.matrix().data());
-                std::cout << "cpt 4" << std::endl;
-                count = vo::cuda::residuals_kernel_wrapper(
-                    current_rgbd_pyramid_.gray_gpu_at(level), last_rgbd_pyramid_.gray_gpu_at(level),
-                    last_rgbd_pyramid_.depth_gpu_at(level), transform_gpu.get(),
-                    last_rgbd_pyramid_.intrinsics_at(level).coeff(0,0),
-                    last_rgbd_pyramid_.intrinsics_at(level).coeff(1,1),
-                    last_rgbd_pyramid_.intrinsics_at(level).coeff(0,2),
-                    last_rgbd_pyramid_.intrinsics_at(level).coeff(1,2), depth_scale_, residuals_gpu.get(),
-                    jacobian_gpu.get(), cv_size.height, cv_size.width
-                );
-                std::cout << "cpt 5" << std::endl;
-                jacobian_gpu.copyToHost(jacobian.data());
-                #endif
 
                 // Solve Normal equations
                 error = weighter_->weight(residuals_image, weights_image);

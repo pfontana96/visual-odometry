@@ -102,7 +102,7 @@ namespace vo {
                     if (empty_)
                         throw std::runtime_error("Cannot query empty pyramid");
 
-                    return gray_pyramid_gpu_[level]->get();
+                    return gray_pyramid_gpu_[level]->pointer.get();
                 }
 
                 inline uint16_t* depth_gpu_at(int level) {
@@ -115,7 +115,7 @@ namespace vo {
                     if (empty_)
                         throw std::runtime_error("Cannot query empty pyramid");
 
-                    return depth_pyramid_gpu_[level]->get();
+                    return depth_pyramid_gpu_[level]->pointer.get();
                 }
                 #endif
 
@@ -139,8 +139,8 @@ namespace vo {
                 std::vector<vo::util::Mat3f> intrinsics_;   
 
                 #ifdef VO_CUDA_ENABLED
-                std::vector<std::unique_ptr<vo::cuda::CudaSharedArray<uint8_t>>> gray_pyramid_gpu_;
-                std::vector<std::unique_ptr<vo::cuda::CudaSharedArray<uint16_t>>> depth_pyramid_gpu_;
+                std::vector<std::unique_ptr<vo::cuda::CudaArray<uint8_t>>> gray_pyramid_gpu_;
+                std::vector<std::unique_ptr<vo::cuda::CudaArray<uint16_t>>> depth_pyramid_gpu_;
                 #endif             
         };
     }  // namespace utils

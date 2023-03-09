@@ -44,7 +44,7 @@ namespace vo {
             public:
 
                 DenseVisualOdometry(
-                    int levels, bool use_gpu, bool use_weighter, float sigma = -1.0f, int max_iterations = 100,
+                    int levels, bool use_weighter, float sigma = -1.0f, int max_iterations = 100,
                     float tolerance = 1e-5
                 );
                 ~DenseVisualOdometry();
@@ -96,7 +96,7 @@ namespace vo {
 
                 int levels_, max_iterations_, height_, width_;
                 float tolerance_, sigma_;
-                bool use_gpu_, use_weighter_, first_frame_, no_camera_info_;
+                bool use_weighter_, first_frame_, no_camera_info_;
 
                 vo::util::Mat3f intrinsics_;
                 float depth_scale_;
