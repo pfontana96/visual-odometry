@@ -14,7 +14,7 @@ To buld the library `vo`, on project's root dir run these commands
 ```bash
 mkdir build && cd build
 cmake ../
-cmake --build . {-DUSE_GPU=ON, -DBUILD_PYTHON=OFF}
+cmake --build . {-DUSE_GPU=ON, -DBUILD_PYTHON=OFF, -DUSE_OMP=OFF}
 ```
 `NOTE: (`{-DXX=ON}` are optional flags)`
 
