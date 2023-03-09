@@ -16,7 +16,8 @@
 #include <utils/types.h>
 
 #ifdef VO_CUDA_ENABLED
-    #include <cuda/common.cuh>
+#include <cuda/common.cuh>
+#include <memory>
 #endif
 
 namespace vo {
@@ -43,7 +44,7 @@ namespace vo {
         class RGBDImagePyramid {
             public:
                 // Methods
-                RGBDImagePyramid(int levels, bool use_gpu);
+                RGBDImagePyramid(int levels);
                 ~RGBDImagePyramid();
 
                 void build_pyramids(
@@ -104,15 +105,14 @@ namespace vo {
 
             private:
                 // Attributes
-                bool empty_, use_gpu_;
+                bool empty_;
                 int levels_;
                 std::vector<cv::Mat> gray_pyramid_, depth_pyramid_;
                 std::vector<vo::util::Mat3f> intrinsics_;   
 
                 #ifdef VO_CUDA_ENABLED
-                    std::vector<vo::cuda::CudaSharedArray<uint8_t>> gray_pyramid_gpu_;
-                    std::vector<vo::cuda::CudaSharedArray<uint16_t>> depth_pyramid_gpu_;
-                    // std::vector<vo::cuda::CudaArray<float>> intrinsics_gpu_;
+                std::vector<std::unique_ptr<vo::cuda::CudaSharedArray<uint8_t>>> gray_pyramid_gpu_;
+                std::vector<std::unique_ptr<vo::cuda::CudaSharedArray<uint16_t>>> depth_pyramid_gpu_;
                 #endif             
         };
     }  // namespace utils

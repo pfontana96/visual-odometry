@@ -5,6 +5,7 @@
 #include <stdint.h>
 #include <iostream>
 #include <stdexcept>
+#include <memory>
 #include <math.h>
 
 #define HANDLE_CUDA_ERROR(err) {vo::cuda::handle_cuda_error(err, __FILE__, __LINE__);}
@@ -34,7 +35,7 @@ namespace vo {
                 };
 
                 ~CudaArray() {
-                    vo::cuda::cuda_free_wrapper(raw_gpu_pointer_);
+                    // vo::cuda::cuda_free_wrapper(raw_gpu_pointer_);
                 }
 
                 T* data() const {
@@ -59,47 +60,42 @@ namespace vo {
         template<typename T>
         class CudaSharedArray{
             public:
-                CudaSharedArray():
-                    size_(-1),
-                    initialized_(false)
-                {};
 
                 CudaSharedArray(int height, int width):
                     size_(width * height * sizeof(T))
                 {
                     vo::cuda::cuda_malloc_managed_wrapper((void**) &raw_pointer_, size_);
-                    initialized_ = true;
                 };
 
                 ~CudaSharedArray() {
-                    if (initialized_)
-                        vo::cuda::cuda_free_wrapper(raw_pointer_);
-                };
-
-                void init(int height, int width) {
-                    size_ = width * height * sizeof(T);
-                    vo::cuda::cuda_malloc_managed_wrapper((void**) &raw_pointer_, size_);
-                    initialized_ = true;
+                    vo::cuda::cuda_free_wrapper(raw_pointer_);
                 };
 
                 T* data() const {
-                    if(!initialized_)
-                        throw std::runtime_error("Cannot access pointer of not initialized CUDA Shared Array");
-
+                    // return raw_pointer_.get();
                     return raw_pointer_;
                 };
 
                 inline int size(){
-                    if(!initialized_)
-                        throw std::runtime_error("Cannot access size of not initialized CUDA Shared Array");
-
                     return size_;
                 };
 
             private:
+
                 int size_;
+                // std::unique_ptr<T, void(*)(T*)> raw_pointer_;
                 T* raw_pointer_;
-                bool initialized_;
+
+                // static void ptr_deleter_ (T* ptr){
+                //     vo::cuda::cuda_free_wrapper(ptr);
+                // };
+
+                // T* ptr_creator_(uint32_t size){
+                //     T* ptr;
+                //     vo::cuda::cuda_malloc_managed_wrapper((void**) &ptr, size * sizeof(T));
+                //     return ptr;
+                // };
+
         };
     }
 }

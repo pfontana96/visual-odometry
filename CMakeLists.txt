@@ -37,13 +37,12 @@ endif(USE_OMP)
 if (USE_GPU)
   message(STATUS "Compiling with GPU support (CUDA)")
   find_package(CUDA REQUIRED)
-  if(CUDA_FOUND)
-    enable_language(CUDA)
+  enable_language(CUDA)
 
-    if(CMAKE_CUDA_COMPILER)
-      set(CMAKE_CUDA_FLAGS "-arch=sm_53")
-      set(CUDA_VERBOSE_BUILD on )
-    endif(CMAKE_CUDA_COMPILER)
+  if(CMAKE_CUDA_COMPILER)
+    set(CMAKE_CUDA_FLAGS "-arch=sm_53")
+    set(CUDA_VERBOSE_BUILD on )
+  endif(CMAKE_CUDA_COMPILER)
 
 endif(USE_GPU)
 

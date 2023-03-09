@@ -14,9 +14,9 @@ void init_image_pyramid(py::module &utils) {
 
     py::class_<vo::util::RGBDImagePyramid>(utils, "RGBDImagePyramid")
         .def(
-            py::init<int, bool>(),
+            py::init<int>(),
             "Initializes RGBD Image Pyramid",
-            py::arg("levels"), py::arg("use_gpu")
+            py::arg("levels")
         )
         .def(
             "build_pyramids", &vo::util::RGBDImagePyramid::build_pyramids,

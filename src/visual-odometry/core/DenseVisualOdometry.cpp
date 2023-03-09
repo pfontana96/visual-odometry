@@ -5,8 +5,8 @@ namespace vo {
         DenseVisualOdometry::DenseVisualOdometry(
             int levels, bool use_gpu, bool use_weighter, float sigma, int max_iterations, float tolerance
         ):
-            last_rgbd_pyramid_(levels, use_gpu),
-            current_rgbd_pyramid_(levels, use_gpu),
+            last_rgbd_pyramid_(levels),
+            current_rgbd_pyramid_(levels),
             levels_(levels),
             max_iterations_(max_iterations),
             tolerance_(tolerance),

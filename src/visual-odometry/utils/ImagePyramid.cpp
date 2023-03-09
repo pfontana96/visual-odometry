@@ -3,19 +3,29 @@
 namespace vo {
     namespace util {
 
-        RGBDImagePyramid::RGBDImagePyramid(int levels, bool use_gpu):
+        RGBDImagePyramid::RGBDImagePyramid(int levels):
             empty_(true),
-            use_gpu_(use_gpu),
             levels_(levels)
         {
+            #ifdef VO_CUDA_ENABLED
+            std::cout << "Yee haa CUDA ENABLED" << std::endl;
+            #else
+            std::cout << "NO CUDA neeeeddeeddd" << std::endl;
+            #endif
+
             assert((levels > 0) || ([levels] {
                 fprintf(stderr, "Expected 'levels' to be greater than 0, got '%d'\n", levels);
                 return false; 
             }()));
 
-            gray_pyramid_.reserve(levels_);
-            depth_pyramid_.reserve(levels_);
-            intrinsics_.reserve(levels_);
+            // gray_pyramid_.reserve(levels_);
+            // depth_pyramid_.reserve(levels_);
+            // intrinsics_.reserve(levels_);
+
+            // #ifdef VO_CUDA_ENABLED
+            // gray_pyramid_gpu_.reserve(levels_);
+            // depth_pyramid_gpu_.reserve(levels_);
+            // #endif
         }
 
         RGBDImagePyramid::~RGBDImagePyramid() {}
@@ -41,20 +51,62 @@ namespace vo {
                 gray_pyramid_.reserve(levels_);
                 depth_pyramid_.reserve(levels_);
                 intrinsics_.reserve(levels_);
+
+                #ifdef VO_CUDA_ENABLED
+                gray_pyramid_gpu_.clear();
+                depth_pyramid_gpu_.clear();
+
+                gray_pyramid_gpu_.reserve(levels_);
+                depth_pyramid_gpu_.reserve(levels_);
+                #endif
             }
 
+            intrinsics_.push_back(intrinsics);
+
+            #ifndef VO_CUDA_ENABLED
             gray_pyramid_.push_back(gray_image);
             depth_pyramid_.push_back(depth_image);
-            intrinsics_.push_back(intrinsics);
+
+            #else
+            int height = gray_image.rows, width = gray_image.cols;
+
+            gray_pyramid_gpu_.emplace_back(std::make_unique<vo::cuda::CudaSharedArray<uint8_t>>(height, width));
+            depth_pyramid_gpu_.emplace_back(std::make_unique<vo::cuda::CudaSharedArray<uint16_t>>(height, width));
+
+            gray_pyramid_.emplace_back(height, width, CV_8UC1, gray_pyramid_gpu_[0]->data());
+            depth_pyramid_.emplace_back(height, width, CV_16UC1, depth_pyramid_gpu_[0]->data());
+
+            gray_image.copyTo(gray_pyramid_[0]);
+            depth_image.copyTo(depth_pyramid_[0]);
+            #endif
 
             for(int i = 1; i < levels_; i++) {
 
+                #ifndef VO_CUDA_ENABLED
                 cv::Mat gray, depth;
                 vo::util::pyrDownMedianSmooth<uint8_t>(gray_pyramid_[i - 1], gray);
                 vo::util::pyrDownMedianSmooth<uint16_t>(depth_pyramid_[i - 1], depth);
 
                 gray_pyramid_.push_back(gray);
                 depth_pyramid_.push_back(depth);
+                
+                #else
+                height = floor(height / 2);
+                width = floor(width / 2);
+
+                gray_pyramid_gpu_.emplace_back(std::make_unique<vo::cuda::CudaSharedArray<uint8_t>>(height, width));
+                depth_pyramid_gpu_.emplace_back(std::make_unique<vo::cuda::CudaSharedArray<uint16_t>>(height, width));
+
+                gray_pyramid_.emplace_back(height, width, CV_8UC1, gray_pyramid_gpu_[i]->data());
+                depth_pyramid_.emplace_back(height, width, CV_16UC1, depth_pyramid_gpu_[i]->data());
+
+                vo::util::pyrDownMedianSmooth<uint8_t>(gray_pyramid_[i - 1], gray_pyramid_[i]);
+                vo::util::pyrDownMedianSmooth<uint16_t>(depth_pyramid_[i - 1], depth_pyramid_[i]);
+
+                std::cout << "Gray GPU pointer: " << gray_pyramid_gpu_[i]->data() << " and CV Mat: " << gray_pyramid_[i].ptr<uint8_t>(0) << std::endl;
+                std::cout << "Depth GPU pointer: " << depth_pyramid_gpu_[i]->data() << " and CV Mat: " << depth_pyramid_[i].ptr<uint16_t>(0) << std::endl;
+
+                #endif
 
                 vo::util::Mat3f scale_matrix;
                 scale_matrix << powf(2, -i), 0.0, powf(2, -i - 1) - 0.5,
