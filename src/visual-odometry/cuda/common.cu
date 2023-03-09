@@ -33,9 +33,11 @@ namespace vo {
         }
 
         void cuda_memcpy_to_device_wrapper(void *dst, const void *src, size_t count) {
-            HANDLE_CUDA_ERROR(
-                cudaMemcpy(dst, src, count, cudaMemcpyKind::cudaMemcpyHostToDevice)
-            );
+            HANDLE_CUDA_ERROR(cudaMemcpy(dst, src, count, cudaMemcpyKind::cudaMemcpyHostToDevice));
+        }
+
+        void cuda_memcpy_to_host_wrapper(void *dst, const void *src, size_t count) {
+            HANDLE_CUDA_ERROR(cudaMemcpy(dst, src, count, cudaMemcpyKind::cudaMemcpyDeviceToHost));
         }
 
         void cuda_malloc_managed_wrapper(void **devPtr, size_t size, unsigned int flags) {

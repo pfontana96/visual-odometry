@@ -30,6 +30,11 @@
 #include <weighter/TDistributionWeighter.h>
 #include <weighter/UniformWeighter.h>
 
+#ifdef VO_CUDA_ENABLED
+#include <cuda/common.cuh>
+#include <cuda/residuals_kernel.cuh>
+#endif
+
 
 namespace vo {
     namespace core {

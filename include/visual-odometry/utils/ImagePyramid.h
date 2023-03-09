@@ -91,6 +91,34 @@ namespace vo {
                     return intrinsics_[level];
                 }
 
+                #ifdef VO_CUDA_ENABLED
+                inline uint8_t* gray_gpu_at(int level) {
+                    if (level < 0 || level >= levels_)
+                        throw std::invalid_argument(
+                            "Expected 'level' to be greater than 0 and less than '" + std::to_string(levels_) +
+                            "', got '" + std::to_string(level) + "' instead."
+                        );
+
+                    if (empty_)
+                        throw std::runtime_error("Cannot query empty pyramid");
+
+                    return gray_pyramid_gpu_[level]->get();
+                }
+
+                inline uint16_t* depth_gpu_at(int level) {
+                    if (level < 0 || level >= levels_)
+                        throw std::invalid_argument(
+                            "Expected 'level' to be greater than 0 and less than '" + std::to_string(levels_) +
+                            "', got '" + std::to_string(level) + "' instead."
+                        );
+
+                    if (empty_)
+                        throw std::runtime_error("Cannot query empty pyramid");
+
+                    return depth_pyramid_gpu_[level]->get();
+                }
+                #endif
+
                 inline bool empty() {
                     return empty_;
                 }

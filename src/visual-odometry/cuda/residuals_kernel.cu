@@ -54,8 +54,8 @@ namespace vo {
 
         __global__ void residuals_kernel(
             const uint8_t* gray_image, const uint8_t* gray_image_prev, const uint16_t* depth_image_prev,
-            const float* transform, const float* intrinsics, float depth_scale, float* residuals_out, float* jacobian,
-            int height, int width, int* count
+            const float* transform, float fx, float fy, float cx, float cy, float depth_scale, float* residuals_out,
+            float* jacobian, int height, int width, int* count
         ) {
             const uint32_t tidx = threadIdx.x + (blockIdx.x * blockDim.x);
             const uint32_t tidy = threadIdx.y + (blockIdx.y * blockDim.y);
@@ -67,7 +67,6 @@ namespace vo {
             const uint32_t pixel = (tidy * width) + tidx;
             const uint32_t jac_row_id = pixel * 6;
 
-            float fx = intrinsics[0], fy = intrinsics[4], cx = intrinsics[2], cy = intrinsics[5];
             float x, y, z, gradx, grady, warped_x, warped_y, interpolated_intensity, x1, y1, z1, z1_squared;
 
             // Deproject point to world
@@ -122,8 +121,8 @@ namespace vo {
 
         int residuals_kernel_wrapper(
             const uint8_t* gray_image, const uint8_t* gray_image_prev, const uint16_t* depth_image_prev,
-            const float* transform, const float* intrinsics, float depth_scale, float* residuals_out, float* jacobian,
-            int height, int width
+            const float* transform, float fx, float fy, float cx, float cy, float depth_scale, float* residuals_out,
+            float* jacobian, int height, int width
         ){
 
             dim3 block(CUDA_BLOCKSIZE, CUDA_BLOCKSIZE), grid;
@@ -133,7 +132,7 @@ namespace vo {
             int count = 0;
 
             residuals_kernel<<<grid, block>>>(
-                gray_image, gray_image_prev, depth_image_prev, transform, intrinsics, depth_scale, residuals_out,
+                gray_image, gray_image_prev, depth_image_prev, transform, fx, fy, cx, cy, depth_scale, residuals_out,
                 jacobian, height, width, &count
             );
 

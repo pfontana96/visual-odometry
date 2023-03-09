@@ -20,6 +20,7 @@ namespace vo {
 
         void cuda_malloc_wrapper(void **devPtr, size_t size);
         void cuda_memcpy_to_device_wrapper(void *dst, const void *src, size_t count);
+        void cuda_memcpy_to_host_wrapper(void *dst, const void *src, size_t count);
         void cuda_malloc_managed_wrapper(void **devPtr, size_t size, unsigned int flags = 1U);
         void cuda_free_wrapper(void *devPtr);
 
@@ -35,17 +36,19 @@ namespace vo {
                 };
 
                 ~CudaArray() {
-                    // vo::cuda::cuda_free_wrapper(raw_gpu_pointer_);
+                    vo::cuda::cuda_free_wrapper(raw_gpu_pointer_);
                 }
 
-                T* data() const {
+                T* get() const {
                     return raw_gpu_pointer_;
                 };
 
                 void copyFromHost(const T* host_ptr) {
-                    vo::cuda::cuda_memcpy_to_device_wrapper(
-                        (void*) raw_gpu_pointer_, (void*) host_ptr, size_
-                    );
+                    vo::cuda::cuda_memcpy_to_device_wrapper((void*) raw_gpu_pointer_, (void*) host_ptr, size_);
+                }
+
+                void copyToHost(T* host_ptr){
+                    vo::cuda::cuda_memcpy_to_host_wrapper((void*) host_ptr, (void*) raw_gpu_pointer_, size_);
                 }
 
                 inline int size(){
@@ -54,7 +57,7 @@ namespace vo {
 
             private:
                 size_t size_;
-                T* raw_gpu_pointer_;
+                T* raw_gpu_pointer_, raw_pointer_;
         };
 
         template<typename T>
@@ -71,8 +74,7 @@ namespace vo {
                     vo::cuda::cuda_free_wrapper(raw_pointer_);
                 };
 
-                T* data() const {
-                    // return raw_pointer_.get();
+                T* get() const {
                     return raw_pointer_;
                 };
 
@@ -83,19 +85,7 @@ namespace vo {
             private:
 
                 int size_;
-                // std::unique_ptr<T, void(*)(T*)> raw_pointer_;
                 T* raw_pointer_;
-
-                // static void ptr_deleter_ (T* ptr){
-                //     vo::cuda::cuda_free_wrapper(ptr);
-                // };
-
-                // T* ptr_creator_(uint32_t size){
-                //     T* ptr;
-                //     vo::cuda::cuda_malloc_managed_wrapper((void**) &ptr, size * sizeof(T));
-                //     return ptr;
-                // };
-
         };
     }
 }

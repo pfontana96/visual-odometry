@@ -18,14 +18,19 @@ namespace vo {
                 return false; 
             }()));
 
-            // gray_pyramid_.reserve(levels_);
-            // depth_pyramid_.reserve(levels_);
-            // intrinsics_.reserve(levels_);
+            gray_pyramid_.reserve(levels_);
+            depth_pyramid_.reserve(levels_);
+            intrinsics_.reserve(levels_);
 
-            // #ifdef VO_CUDA_ENABLED
-            // gray_pyramid_gpu_.reserve(levels_);
-            // depth_pyramid_gpu_.reserve(levels_);
-            // #endif
+            #ifdef VO_CUDA_ENABLED
+            std::cout << "hola" << std::endl;
+            std::cout << "hssd" << std::endl;
+            std::cout << "como" << std::endl;
+            std::cout << "sdgs" << std::endl;
+            std::cout << "estas" << std::endl;
+            gray_pyramid_gpu_.reserve(levels_);
+            depth_pyramid_gpu_.reserve(levels_);
+            #endif
         }
 
         RGBDImagePyramid::~RGBDImagePyramid() {}
@@ -72,9 +77,10 @@ namespace vo {
 
             gray_pyramid_gpu_.emplace_back(std::make_unique<vo::cuda::CudaSharedArray<uint8_t>>(height, width));
             depth_pyramid_gpu_.emplace_back(std::make_unique<vo::cuda::CudaSharedArray<uint16_t>>(height, width));
+            std::cout << "ip start" << std::endl;
 
-            gray_pyramid_.emplace_back(height, width, CV_8UC1, gray_pyramid_gpu_[0]->data());
-            depth_pyramid_.emplace_back(height, width, CV_16UC1, depth_pyramid_gpu_[0]->data());
+            gray_pyramid_.emplace_back(height, width, CV_8UC1, gray_pyramid_gpu_[0]->get());
+            depth_pyramid_.emplace_back(height, width, CV_16UC1, depth_pyramid_gpu_[0]->get());
 
             gray_image.copyTo(gray_pyramid_[0]);
             depth_image.copyTo(depth_pyramid_[0]);
@@ -96,15 +102,14 @@ namespace vo {
 
                 gray_pyramid_gpu_.emplace_back(std::make_unique<vo::cuda::CudaSharedArray<uint8_t>>(height, width));
                 depth_pyramid_gpu_.emplace_back(std::make_unique<vo::cuda::CudaSharedArray<uint16_t>>(height, width));
+                std::cout << "ip cpt 1 level" << i + 1 << std::endl;
 
-                gray_pyramid_.emplace_back(height, width, CV_8UC1, gray_pyramid_gpu_[i]->data());
-                depth_pyramid_.emplace_back(height, width, CV_16UC1, depth_pyramid_gpu_[i]->data());
+                gray_pyramid_.emplace_back(height, width, CV_8UC1, gray_pyramid_gpu_[i]->get());
+                depth_pyramid_.emplace_back(height, width, CV_16UC1, depth_pyramid_gpu_[i]->get());
 
                 vo::util::pyrDownMedianSmooth<uint8_t>(gray_pyramid_[i - 1], gray_pyramid_[i]);
                 vo::util::pyrDownMedianSmooth<uint16_t>(depth_pyramid_[i - 1], depth_pyramid_[i]);
-
-                std::cout << "Gray GPU pointer: " << gray_pyramid_gpu_[i]->data() << " and CV Mat: " << gray_pyramid_[i].ptr<uint8_t>(0) << std::endl;
-                std::cout << "Depth GPU pointer: " << depth_pyramid_gpu_[i]->data() << " and CV Mat: " << depth_pyramid_[i].ptr<uint16_t>(0) << std::endl;
+                std::cout << "ip end level " << i+1 << std::endl;
 
                 #endif
 
