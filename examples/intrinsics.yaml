@@ -1,0 +1,8 @@
+# See: https://vision.in.tum.de/data/datasets/rgbd-dataset/file_formats
+
+intrinsics: [517.3, 0.0, 318.6, 0.0, 516.5, 239.5, 0.0, 0.0, 1.0]
+
+depth_scale: 0.0002
+
+height: 480
+width: 640
