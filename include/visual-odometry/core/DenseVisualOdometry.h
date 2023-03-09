@@ -17,6 +17,10 @@
 #include <eigen3/Eigen/Core>
 #include <eigen3/Eigen/LU>
 
+#ifdef VO_OMP_ENABLED
+#include <omp.h>
+#endif
+
 #include <utils/types.h>
 #include <utils/ImagePyramid.h>
 #include <utils/interpolate.h>

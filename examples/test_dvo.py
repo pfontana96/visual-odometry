@@ -284,6 +284,7 @@ def main():
 
     visualize = additional_info.pop("visualize")
 
+    exec_time = 0.0
     gt_transforms_tum_fmt = []
     transforms = []
     poses = []
@@ -304,6 +305,7 @@ def main():
 
         else:
             accumulated_transform = accumulated_transform @ inverse(transform)
+            exec_time += (e - s)
 
         # Error is only the euclidean distance (not taking rotation into account)
         if gt_transform is not None:
@@ -338,6 +340,9 @@ def main():
 
         # Store translational error
         errors.append(t_error)
+
+    exec_time /= (len(poses) - 1)  # not taking into account first step (almost 0s)
+    logger.info("Mean execution time: {:.4f} s".format(exec_time))
 
     # Dump results
     report = {
