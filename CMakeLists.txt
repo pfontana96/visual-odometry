@@ -25,12 +25,12 @@ include_directories(ThirdParty/Sophus)
 find_package(OpenCV 4 REQUIRED)
 
 # Find OpenMP
-find_package(OpenMP)
-if(OpenMP_FOUND)
+if (USE_OMP)
+  find_package(OpenMP REQUIRED)
   message(STATUS "Found OpenMP")
   set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${OpenMP_CXX_FLAGS}")
   set(CMAKE_EXE_LINKER_FLAGS "${CMAKE_EXE_LINKER_FLAGS} ${OpenMP_EXE_LINKER_FLAGS}")
-endif(OpenMP_FOUND)
+endif(USE_OMP)
 
 # Enable CUDA
 # option(USE_GPU "Option to build for GPU support" OFF)
@@ -71,6 +71,10 @@ if(USE_GPU)
   set_target_properties(vo PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   set_target_properties(vo PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 endif(USE_GPU)
+
+if (USE_OMP)
+
+endif(USE_OMP)
 
 target_link_libraries(
   vo
