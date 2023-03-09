@@ -195,6 +195,11 @@ namespace vo {
             Eigen::Matrix<float, 2, 6, Eigen::RowMajor> Jw;
             Eigen::Matrix<float, 1, 2> Ji;
 
+            #ifdef VO_OMP_ENABLED
+            #pragma omp parallel for num_threads(omp_get_max_threads()) shared(count)\
+                    private(Jw, Ji, point, x, y, z, gradx, grady, warped_x, warped_y, interpolated_intensity) \
+                    collapse(2)
+            #endif
             for (int v = 0; v < gray_image.rows; v++) {
                 for (int u = 0; u < gray_image.cols; u++) {
 
@@ -247,6 +252,10 @@ namespace vo {
                     }
 
                     residuals_out.at<float>(v, u) = interpolated_intensity - (float) gray_image_prev.at<uint8_t>(v, u);
+
+                    #ifdef VO_OMP_ENABLED
+                    #pragma omp atomic update
+                    #endif
                     count++;
                 }
             }

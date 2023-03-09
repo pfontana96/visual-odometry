@@ -9,7 +9,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE Release)
 endif()
 message(STATUS "Build type: ${CMAKE_BUILD_TYPE}")
-set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -Wextra")
+set(CMAKE_CXX_FLAGS_RELEASE "-O3 -Wall -Wextra -ftree-vectorize")
 
 # find_package(Boost REQUIRED COMPONENTS system)
 find_package(Eigen3 REQUIRED)
@@ -73,7 +73,7 @@ if(USE_GPU)
 endif(USE_GPU)
 
 if (USE_OMP)
-
+  target_compile_definitions(vo PRIVATE VO_OMP_ENABLED)
 endif(USE_OMP)
 
 target_link_libraries(
