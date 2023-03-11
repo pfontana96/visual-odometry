@@ -86,6 +86,18 @@ target_link_libraries(
     # $<$<BOOL:${OpenMP_FOUND}>:OpenMP::OpenMP_CXX>
 )
 
+# Testing C++ application
+if (BUILD_EXAMPLES)
+  message("Building C++ examples")
+  find_package(Boost 1.40 COMPONENTS program_options REQUIRED)
+  add_executable(test_dvo ${CMAKE_CURRENT_LIST_DIR}/examples/test_dvo.cpp)
+  target_link_libraries(test_dvo PRIVATE
+    vo
+    ${Boost_LIBRARIES}
+  )
+
+endif(BUILD_EXAMPLES)
+
 # Python bindings
 if(BUILD_PYTHON)
   message("Building Python Bindings")

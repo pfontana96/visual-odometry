@@ -5,6 +5,13 @@
 namespace vo {
     namespace cuda {
 
+        void cuda_init_device(){
+            // NOTE: Not support for multiple GPUs yet
+            vo::cuda::query_devices();
+            HANDLE_CUDA_ERROR(cudaSetDeviceFlags(cudaDeviceMapHost));
+            HANDLE_CUDA_ERROR(cudaSetDevice(0));
+        }
+
         void handle_cuda_error(int err, const char* file, int line)
         {
             if(err != cudaSuccess)

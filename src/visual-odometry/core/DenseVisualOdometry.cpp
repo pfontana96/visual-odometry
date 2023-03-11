@@ -22,6 +22,10 @@ namespace vo {
                 weighter_ = std::make_shared<vo::weighter::UniformWeighter>();
                 std::cout << "Not using weighter" << std::endl;
             }
+
+            #ifdef VO_CUDA_ENABLED
+            vo::cuda::cuda_init_device();
+            #endif
         }
 
         DenseVisualOdometry::~DenseVisualOdometry(){};

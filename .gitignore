@@ -1,6 +1,7 @@
 devel/
 logs/
 build/
+Debug/
 bin/
 lib/
 

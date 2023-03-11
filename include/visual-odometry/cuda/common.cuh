@@ -18,6 +18,7 @@ namespace vo {
 
         void handle_cuda_error(int err, const char* file, int line);
 
+        void cuda_init_device();
         void cuda_malloc_wrapper(void **devPtr, size_t size);
         void cuda_memcpy_to_device_wrapper(void *dst, const void *src, size_t count);
         void cuda_memcpy_to_host_wrapper(void *dst, const void *src, size_t count);
@@ -28,7 +29,7 @@ namespace vo {
 
         template<typename T>
         T* cuda_pointer_creator(int size, bool managed_memory) {
-            T* ptr = new T(size);
+            T* ptr = NULL;
 
             if (managed_memory) {
                 vo::cuda::cuda_malloc_managed_wrapper((void**) &ptr, size * sizeof(T));
