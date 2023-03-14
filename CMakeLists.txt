@@ -68,13 +68,13 @@ target_include_directories( vo PUBLIC
 )
 
 if(USE_GPU)
-  target_compile_definitions(vo PRIVATE VO_CUDA_ENABLED)
+  target_compile_definitions(vo PUBLIC VO_CUDA_ENABLED)
   set_target_properties(vo PROPERTIES CUDA_SEPARABLE_COMPILATION ON)
   set_target_properties(vo PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 endif(USE_GPU)
 
 if (USE_OMP)
-  target_compile_definitions(vo PRIVATE VO_OMP_ENABLED)
+  target_compile_definitions(vo PUBLIC VO_OMP_ENABLED)
 endif(USE_OMP)
 
 target_link_libraries(
@@ -116,7 +116,7 @@ if(BUILD_PYTHON)
   )
 
   if(USE_GPU)
-    target_compile_definitions(pyvo PRIVATE PYVO_CUDA_ENABLED)
+    target_compile_definitions(pyvo PUBLIC PYVO_CUDA_ENABLED)
   endif(USE_GPU)
 
   target_link_libraries(pyvo PRIVATE
