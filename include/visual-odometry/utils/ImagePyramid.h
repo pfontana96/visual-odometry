@@ -139,8 +139,8 @@ namespace vo {
                 std::vector<vo::util::Mat3f> intrinsics_;   
 
                 #ifdef VO_CUDA_ENABLED
-                std::vector<std::unique_ptr<vo::cuda::CudaArray<uint8_t>>> gray_pyramid_gpu_;
-                std::vector<std::unique_ptr<vo::cuda::CudaArray<uint16_t>>> depth_pyramid_gpu_;
+                std::vector<std::shared_ptr<vo::cuda::CudaArray<uint8_t>>> gray_pyramid_gpu_;
+                std::vector<std::shared_ptr<vo::cuda::CudaArray<uint16_t>>> depth_pyramid_gpu_;
                 #endif             
         };
     }  // namespace utils

@@ -65,12 +65,8 @@ namespace vo {
             #else
             int height = gray_image.rows, width = gray_image.cols;
 
-            gray_pyramid_gpu_.emplace_back(
-                std::make_unique<vo::cuda::CudaArray<uint8_t>>(height, width, true)
-            );
-            depth_pyramid_gpu_.emplace_back(
-                std::make_unique<vo::cuda::CudaArray<uint16_t>>(height, width, true)
-            );
+            gray_pyramid_gpu_.emplace_back(std::make_shared<vo::cuda::CudaArray<uint8_t>>(height, width, true));
+            depth_pyramid_gpu_.emplace_back(std::make_shared<vo::cuda::CudaArray<uint16_t>>(height, width, true));
 
             gray_pyramid_.emplace_back(height, width, CV_8UC1, gray_pyramid_gpu_[0]->pointer.get());
             depth_pyramid_.emplace_back(height, width, CV_16UC1, depth_pyramid_gpu_[0]->pointer.get());
@@ -93,12 +89,8 @@ namespace vo {
                 height = floor(height / 2);
                 width = floor(width / 2);
 
-                gray_pyramid_gpu_.emplace_back(
-                    std::make_unique<vo::cuda::CudaArray<uint8_t>>(height, width, true)
-                );
-                depth_pyramid_gpu_.emplace_back(
-                    std::make_unique<vo::cuda::CudaArray<uint16_t>>(height, width, true)
-                );
+                gray_pyramid_gpu_.emplace_back(std::make_shared<vo::cuda::CudaArray<uint8_t>>(height, width, true));
+                depth_pyramid_gpu_.emplace_back(std::make_shared<vo::cuda::CudaArray<uint16_t>>(height, width, true));
 
                 gray_pyramid_.emplace_back(height, width, CV_8UC1, gray_pyramid_gpu_[i]->pointer.get());
                 depth_pyramid_.emplace_back(height, width, CV_16UC1, depth_pyramid_gpu_[i]->pointer.get());

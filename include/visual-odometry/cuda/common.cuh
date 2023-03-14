@@ -27,42 +27,33 @@ namespace vo {
 
         void query_devices();
 
-        template<typename T>
-        T* cuda_pointer_creator(int size, bool managed_memory) {
-            T* ptr = NULL;
-
-            if (managed_memory) {
-                vo::cuda::cuda_malloc_managed_wrapper((void**) &ptr, size * sizeof(T));
-
-            } else {
-                vo::cuda::cuda_malloc_wrapper((void**) &ptr, size * sizeof(T));
-            }
-
-            return ptr;
-        };
-
-        template<typename T>
-        void cuda_pointer_deleter(T* ptr) {
-            vo::cuda::cuda_free_wrapper(ptr);
-        };
+        void* CudaMallocSmart(int size, bool managed_memory);
 
         template<typename T>
         struct CudaArray : public std::enable_shared_from_this<vo::cuda::CudaArray<T>> {
 
             int size;
             bool managed_memory;
+            
             std::shared_ptr<T> pointer;
 
-            CudaArray(int height, int width, bool managed_memory = false):
+            struct CudaDeleter {
+                void operator() (T* ptr) {vo::cuda::cuda_free_wrapper(ptr);}
+            };
+
+            CudaArray(int height, int width, bool managed_memory_ = false):
                 size(width * height * sizeof(T)),
-                managed_memory(managed_memory),
+                managed_memory(managed_memory_),
                 pointer(
-                    vo::cuda::cuda_pointer_creator<T>(height * width, managed_memory),
-                    vo::cuda::cuda_pointer_deleter<T>
+                    (T*) CudaMallocSmart(width * height * sizeof(T), managed_memory),
+                    CudaDeleter()
                 )
             {};
 
+            ~CudaArray(){};
+
         };
+
     }
 }
 

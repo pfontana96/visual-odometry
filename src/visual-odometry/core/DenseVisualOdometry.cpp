@@ -66,10 +66,8 @@ namespace vo {
 
             cv::Mat gray_image;
             cv::cvtColor(color_image, gray_image, cv::COLOR_BGR2GRAY);
-            std::cout << "here" << std::endl;
 
             if (first_frame_ == true) {
-                std::cout << "lololo" << std::endl;
                 last_rgbd_pyramid_.build_pyramids(
                     gray_image, depth_image, intrinsics_
                 );

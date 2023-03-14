@@ -6,7 +6,7 @@ namespace vo {
     namespace cuda {
 
         void cuda_init_device(){
-            // NOTE: Not support for multiple GPUs yet
+            // @note Not support for multiple GPUs yet
             vo::cuda::query_devices();
             HANDLE_CUDA_ERROR(cudaSetDeviceFlags(cudaDeviceMapHost));
             HANDLE_CUDA_ERROR(cudaSetDevice(0));
@@ -16,7 +16,7 @@ namespace vo {
         {
             if(err != cudaSuccess)
             {
-                printf("%s in %s at line %d\n", cudaGetErrorString((cudaError_t) err), file, line);
+                printf("CUDA ERROR: %s in %s at line %d\n", cudaGetErrorString((cudaError_t) err), file, line);
                 exit(EXIT_FAILURE);
             }
         };
@@ -29,9 +29,9 @@ namespace vo {
             {
                 cudaDeviceProp dev_prop;
                 cudaGetDeviceProperties(&dev_prop, i);
-                printf("Found CUDA Capable device %s (%d.%d)\n", dev_prop.name, 
-                                                            dev_prop.major,
-                                                            dev_prop.minor);
+                printf(
+                    "Found CUDA Capable device %s (%d.%d)\n", dev_prop.name, dev_prop.major, dev_prop.minor
+                );
             }
         }
 
@@ -53,6 +53,16 @@ namespace vo {
 
         void cuda_free_wrapper(void *devPtr) {
             HANDLE_CUDA_ERROR(cudaFree(devPtr));
+        }
+
+        void* CudaMallocSmart(int size, bool managed_memory) {
+            void* ptr;
+            if (managed_memory) {
+                vo::cuda::cuda_malloc_managed_wrapper((void**) &ptr, size);
+            } else {
+                vo::cuda::cuda_malloc_wrapper((void**) &ptr, size);
+            }
+            return ptr;
         }
 
     } // namespace cuda
