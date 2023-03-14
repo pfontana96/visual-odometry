@@ -101,17 +101,34 @@ namespace vo {
             float error_prev = std::numeric_limits<float>::max();
 
             cv::Size cv_size = current_rgbd_pyramid_.gray_at(level).size();
+
+            #ifndef VO_CUDA_ENABLED
             cv::Mat residuals_image(cv_size.height, cv_size.width, CV_32F);
-            Eigen::Map<vo::util::VecXf> residuals(
-                residuals_image.ptr<float>(), cv_size.height * cv_size.width
-            );
+            Eigen::Map<vo::util::VecXf> residuals(residuals_image.ptr<float>(), cv_size.height * cv_size.width);
 
             cv::Mat weights_image(cv_size.height, cv_size.width, CV_32F);
-            Eigen::Map<vo::util::VecXf> weights(
-                weights_image.ptr<float>(), cv_size.height * cv_size.width
-            );
+            Eigen::Map<vo::util::VecXf> weights(weights_image.ptr<float>(), cv_size.height * cv_size.width);
 
             vo::util::MatX6f jacobian(cv_size.height * cv_size.width, 6);
+
+            #else
+            vo::cuda::CudaArray<float> residuals_arr(cv_size.height, cv_size.width, true);
+            cv::Mat residuals_image(cv_size.height, cv_size.width, CV_32F, residuals_arr.pointer.get());
+            Eigen::Map<vo::util::VecXf> residuals(residuals_arr.pointer.get(), cv_size.height * cv_size.width);
+
+            // @note support GPU on weights too
+            cv::Mat weights_image(cv_size.height, cv_size.width, CV_32F);
+            Eigen::Map<vo::util::VecXf> weights(weights_image.ptr<float>(), cv_size.height * cv_size.width);
+
+            vo::cuda::CudaArray<float> jacobian_arr(cv_size.height * cv_size.width, 6, true);
+            Eigen::Map<vo::util::MatX6f> jacobian(jacobian_arr.pointer.get(), cv_size.height * cv_size.width, 6);
+
+            vo::cuda::CudaArray<float> transform_gpu(4, 4);
+
+            vo::util::Mat3f intrinsics = current_rgbd_pyramid_.intrinsics_at(level);
+            float fx = intrinsics.coeff(0, 0), fy = intrinsics.coeff(1, 1), cx = intrinsics.coeff(0, 2), cy = intrinsics.coeff(1, 2);
+            #endif
+
             vo::util::Vec6f solution, b;
             vo::util::Mat6f H;
 
@@ -123,11 +140,25 @@ namespace vo {
 
             for (size_t it = 0; it < (size_t) max_iterations_; it++) {
 
+                #ifndef VO_CUDA_ENABLED
                 count = compute_residuals_and_jacobian_(
                     current_rgbd_pyramid_.gray_at(level), last_rgbd_pyramid_.gray_at(level),
                     last_rgbd_pyramid_.depth_at(level), xi.matrix(), last_rgbd_pyramid_.intrinsics_at(level),
                     depth_scale_, residuals_image, jacobian
                 );
+
+                #else
+
+                vo::cuda::cuda_memcpy_to_device_wrapper(
+                    transform_gpu.pointer.get(), xi.matrix().data(), transform_gpu.size
+                );
+                count = vo::cuda::residuals_kernel_wrapper(
+                    current_rgbd_pyramid_.gray_gpu_at(level), last_rgbd_pyramid_.gray_gpu_at(level),
+                    last_rgbd_pyramid_.depth_gpu_at(level), transform_gpu.pointer.get(), fx, fy, cx, cy, depth_scale_,
+                    residuals_arr.pointer.get(), jacobian_arr.pointer.get(), cv_size.height, cv_size.width
+                );
+
+                #endif
 
                 // Solve Normal equations
                 error = weighter_->weight(residuals_image, weights_image);
