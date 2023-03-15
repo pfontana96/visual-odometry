@@ -38,67 +38,55 @@ namespace vo {
                 );
             }
 
-            if (empty_ == false) {
-                gray_pyramid_.clear();
-                depth_pyramid_.clear();
-                intrinsics_.clear();
-
-                gray_pyramid_.reserve(levels_);
-                depth_pyramid_.reserve(levels_);
-                intrinsics_.reserve(levels_);
-
-                #ifdef VO_CUDA_ENABLED
-                gray_pyramid_gpu_.clear();
-                depth_pyramid_gpu_.clear();
-
-                gray_pyramid_gpu_.reserve(levels_);
-                depth_pyramid_gpu_.reserve(levels_);
-                #endif
-            }
-
-            intrinsics_.push_back(intrinsics);
-
-            #ifndef VO_CUDA_ENABLED
-            gray_pyramid_.push_back(gray_image);
-            depth_pyramid_.push_back(depth_image);
-
-            #else
             int height = gray_image.rows, width = gray_image.cols;
 
-            gray_pyramid_gpu_.emplace_back(std::make_shared<vo::cuda::CudaArray<uint8_t>>(height, width, true));
-            depth_pyramid_gpu_.emplace_back(std::make_shared<vo::cuda::CudaArray<uint16_t>>(height, width, true));
-
-            gray_pyramid_.emplace_back(height, width, CV_8UC1, gray_pyramid_gpu_[0]->pointer.get());
-            depth_pyramid_.emplace_back(height, width, CV_16UC1, depth_pyramid_gpu_[0]->pointer.get());
-
-            gray_image.copyTo(gray_pyramid_[0]);
-            depth_image.copyTo(depth_pyramid_[0]);
-            #endif
-
-            for(int i = 1; i < levels_; i++) {
-
-                #ifndef VO_CUDA_ENABLED
-                cv::Mat gray, depth;
-                vo::util::pyrDownMedianSmooth<uint8_t>(gray_pyramid_[i - 1], gray);
-                vo::util::pyrDownMedianSmooth<uint16_t>(depth_pyramid_[i - 1], depth);
-
-                gray_pyramid_.push_back(gray);
-                depth_pyramid_.push_back(depth);
-                
-                #else
-                height = floor(height / 2);
-                width = floor(width / 2);
-
+            if (empty_) {
+                #ifdef VO_CUDA_ENABLED
                 gray_pyramid_gpu_.emplace_back(std::make_shared<vo::cuda::CudaArray<uint8_t>>(height, width, true));
                 depth_pyramid_gpu_.emplace_back(std::make_shared<vo::cuda::CudaArray<uint16_t>>(height, width, true));
 
-                gray_pyramid_.emplace_back(height, width, CV_8UC1, gray_pyramid_gpu_[i]->pointer.get());
-                depth_pyramid_.emplace_back(height, width, CV_16UC1, depth_pyramid_gpu_[i]->pointer.get());
+                gray_pyramid_.emplace_back(height, width, CV_8UC1, gray_pyramid_gpu_[0]->pointer.get());
+                depth_pyramid_.emplace_back(height, width, CV_16UC1, depth_pyramid_gpu_[0]->pointer.get());
+
+                #else
+                gray_pyramid_.emplace_back(height, width, CV_8UC1);
+                depth_pyramid_.emplace_back(height, width, CV_16UC1);
+
+                #endif
+            
+            } else {
+                // @note currently not bothering on optimizing the creation ofs everal intrinsics matrix as it's small
+                intrinsics_.clear();
+                intrinsics_.reserve(levels_);
+            }
+
+            gray_image.copyTo(gray_pyramid_[0]);
+            depth_image.copyTo(depth_pyramid_[0]);
+
+            intrinsics_.push_back(intrinsics);
+
+            for(int i = 1; i < levels_; i++) {
+
+                height = floor(height / 2);
+                width = floor(width / 2);
+
+                if(empty_) {
+                    #ifdef VO_CUDA_ENABLED
+                    gray_pyramid_gpu_.emplace_back(std::make_shared<vo::cuda::CudaArray<uint8_t>>(height, width, true));
+                    depth_pyramid_gpu_.emplace_back(std::make_shared<vo::cuda::CudaArray<uint16_t>>(height, width, true));
+
+                    gray_pyramid_.emplace_back(height, width, CV_8UC1, gray_pyramid_gpu_[i]->pointer.get());
+                    depth_pyramid_.emplace_back(height, width, CV_16UC1, depth_pyramid_gpu_[i]->pointer.get());
+
+                    #else
+                    gray_pyramid_.emplace_back(height, width, CV_8UC1);
+                    depth_pyramid_.emplace_back(height, width, CV_16UC1);
+
+                    #endif
+                }
 
                 vo::util::pyrDownMedianSmooth<uint8_t>(gray_pyramid_[i - 1], gray_pyramid_[i]);
                 vo::util::pyrDownMedianSmooth<uint16_t>(depth_pyramid_[i - 1], depth_pyramid_[i]);
-
-                #endif
 
                 vo::util::Mat3f scale_matrix;
                 scale_matrix << powf(2, -i), 0.0, powf(2, -i - 1) - 0.5,
