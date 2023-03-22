@@ -269,11 +269,12 @@ def visualize_trajectory(estimated_poses: np.ndarray, ground_truth_poses: np.nda
             gt_available = False
 
     ax = plt.subplot(projection="3d")
-    ax.plot(poses[:, 0], poses[:, 1], poses[:, 2])
+    ax.plot(poses[:, 0], poses[:, 1], poses[:, 2], label="estimated")
 
     if gt_available:
-        ax.plot(gt_poses[:, 0], gt_poses[:, 1], gt_poses[:, 2], color="red")
+        ax.plot(gt_poses[:, 0], gt_poses[:, 1], gt_poses[:, 2], color="red", label="ground truth")
 
+    ax.legend()
     plt.show()
 
 def main():
@@ -289,6 +290,7 @@ def main():
     transforms = []
     poses = []
     errors = []
+    relative_errors = []
     for i, (rgb_image, depth_image, gt_transform) in enumerate(zip(rgb_images, depth_images, gt_transforms)):
 
         s = time()
@@ -310,10 +312,18 @@ def main():
         # Error is only the euclidean distance (not taking rotation into account)
         if gt_transform is not None:
             t_error = float(np.linalg.norm(accumulated_transform[:3, 3] - gt_transform[:3, 3]))
+
+            if i != 0:
+                relative_gt_transform = gt_transform @ inverse(gt_transform_prev)
+                r_terror = float(np.linalg.norm(transform[:3, 3] - relative_gt_transform[:3, 3]))
+            else:
+                r_terror = 0.0
+
             logger.info("[Frame {} ({:.3f} s)] | Translational error: {:.4f} m ".format(i + 1, e - s, t_error))
 
         else:
             t_error = "N/A"
+            r_terror = "N/A}"
             logger.info("[Frame {} ({:.3f} s)]".format(i + 1, e - s))
 
         # Store pose in TUM dataset format 'tx ty tz qx qy qz qw'
@@ -335,11 +345,15 @@ def main():
             gt_tum_fmt[3:] = np.roll(rotmat_to_quaternion(gt_transform[:3, :3]), -1)
             gt_transforms_tum_fmt.append(gt_tum_fmt.tolist())
 
+            # Update gt_prev to also compute relative error
+            gt_transform_prev = gt_transform.copy()
+
         else:
             gt_transforms_tum_fmt.append(None)
 
         # Store translational error
         errors.append(t_error)
+        relative_errors.append(r_terror)
 
     exec_time /= (len(poses) - 1)  # not taking into account first step (almost 0s)
     logger.info("Mean execution time: {:.4f} s".format(exec_time))
@@ -362,6 +376,11 @@ def main():
         json.dump(report, fp, indent=2)
 
     logger.info("Dumped report at '{}'".format(str(output_file)))
+
+    rmse = np.sqrt((np.asarray(errors, dtype=np.float32) ** 2).mean())
+    rmsre = np.sqrt((np.asarray(relative_errors, dtype=np.float32) ** 2).mean())
+    logger.info("RMSE absolute: {:.6f} m".format(rmse))
+    logger.info("RMSE relative: {:.6f} m".format(rmsre))
 
     if visualize:
         visualize_trajectory(poses, gt_transforms_tum_fmt)
