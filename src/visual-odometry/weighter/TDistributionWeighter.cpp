@@ -44,7 +44,7 @@ namespace vo {
 
                     residual_i = residuals.at<float>(y, x);
 
-                    if (std::isfinite(residual_i)) {
+                    if (vo::util::isfinite(residual_i)) {
                         residual_squared_i = residual_i * residual_i;
                         sigma_squared += (
                             residual_squared_i * (((float) dof_ + 1.0f) / ((float) dof_ + residual_squared_i * last_lambda))
@@ -64,7 +64,7 @@ namespace vo {
 
                     residual_i = residuals.at<float>(y, x);
 
-                    if (std::isfinite(residual_i)) {
+                    if (vo::util::isfinite(residual_i)) {
                         residual_squared_i = residual_i * residual_i;
                         weights_out.at<float>(y, x) = ((float) dof_ + 1.0f) / ((float) dof_ + residual_squared_i * lambda);
 

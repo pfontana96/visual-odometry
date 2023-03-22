@@ -3,6 +3,8 @@
 
 #include <opencv2/core.hpp>
 
+#include <utils/common.h>
+
 
 namespace vo {
     namespace weighter {

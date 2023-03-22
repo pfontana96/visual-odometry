@@ -14,7 +14,7 @@ namespace vo {
                 for (int x = 0; x < residuals.cols; x++) {
                     residual_i = residuals.at<float>(y, x);
 
-                    if (std::isfinite(residual_i)) {
+                    if (vo::util::isfinite(residual_i)) {
                         weights_out.at<float>(y, x) = 1.0f;
                         error += residuals.at<float>(y, x) * residuals.at<float>(y, x);
                     } else {
